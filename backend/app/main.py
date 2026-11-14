@@ -4,11 +4,14 @@ Run:  uvicorn app.main:app --reload
 Docs: http://127.0.0.1:8000/docs
 """
 import os
+import threading
+import time
 from functools import lru_cache
 from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 
 from .calibration import (
     CALIBRATABLE, apply_corrections, compute_corrections, delete_station_data, load_station_data, save_station_data,
@@ -34,6 +37,16 @@ app = FastAPI(
     version="2.0.0",
 )
 
+# The Terra Tuta frontend talks to this API either through its own dev-server proxy (/api/climate/*)
+# or directly from the browser. CORS_ORIGINS="https://a.example,https://b.example" restricts the
+# allowed origins; the default is open so the hackathon demo works from any host.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in os.environ.get("CORS_ORIGINS", "*").split(",") if o.strip()],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 LatQuery = Query(..., ge=-90, le=90, description="Latitude in decimal degrees")
 LonQuery = Query(..., ge=-180, le=180, description="Longitude in decimal degrees")
 
@@ -51,12 +64,32 @@ def _daily(lat: float, lon: float) -> Tuple[pd.DataFrame, Dict]:
     return (apply_corrections(daily, corrections) if corrections else daily), corrections
 
 
-_location_cache: Dict[Tuple[float, float], Dict] = {}
+# A complete result is kept for the life of the process. A degraded one (some CMIP6 models failed,
+# e.g. Open-Meteo rate limit) is kept for DEGRADED_TTL_S only, so a later request retries the models
+# without every request in between re-training the whole ensemble.
+DEGRADED_TTL_S = float(os.environ.get("DEGRADED_CACHE_TTL_S", 900))
+_location_cache: Dict[Tuple[float, float], Tuple[Dict, Optional[float]]] = {}  # key -> (result, expiry or None)
+_location_locks: Dict[Tuple[float, float], threading.Lock] = {}
+_locks_guard = threading.Lock()
 
 
 def _location(lat: float, lon: float) -> Dict:
-    if (lat, lon) in _location_cache:
-        return _location_cache[(lat, lon)]
+    key = (lat, lon)
+    with _locks_guard:
+        lock = _location_locks.setdefault(key, threading.Lock())
+    # One training run per location: concurrent requests (the frontend asks /agri-summary and /risk
+    # in parallel) wait for it instead of training the same ensemble several times at once.
+    with lock:
+        cached = _location_cache.get(key)
+        if cached is not None and (cached[1] is None or cached[1] > time.monotonic()):
+            return cached[0]
+        result = _train_location(lat, lon)
+        degraded = bool(result["sources"]["climate_projection_errors"])
+        _location_cache[key] = (result, time.monotonic() + DEGRADED_TTL_S if degraded else None)
+        return result
+
+
+def _train_location(lat: float, lon: float) -> Dict:
     daily, corrections = _daily(lat, lon)
     projections, cmip_models, cmip_errors = fetch_projections(lat, lon)
     indices = fetch_climate_indices()
@@ -77,9 +110,6 @@ def _location(lat: float, lon: float) -> Dict:
             c: indices[c].dropna().index[-1].strftime("%Y-%m") for c in indices.columns if indices[c].notna().any()
         } or None,
     }
-    # Don't cache a degraded result – a later request may get the missing climate models.
-    if not cmip_errors:
-        _location_cache[(lat, lon)] = result
     return result
 
 

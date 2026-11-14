@@ -1,0 +1,81 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    font-family: var(--font-sans);
+    background-color: #111316;
+    color: #eceef0;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* Mapbox GL dark anthracite theme integration */
+.mapboxgl-map {
+  font-family: var(--font-mono);
+  background: #111316;
+  isolation: isolate;
+}
+
+.mapboxgl-ctrl-group {
+  background-color: #171a1f !important;
+  border: 1px solid #262b33 !important;
+  border-radius: 2px !important;
+  box-shadow: none !important;
+}
+
+.mapboxgl-ctrl-group button {
+  background-color: #171a1f !important;
+  border-color: #262b33 !important;
+  transition: background-color 0.2s ease;
+}
+
+.mapboxgl-ctrl-group button:hover {
+  background-color: #262b33 !important;
+}
+
+.mapboxgl-ctrl-group button .mapboxgl-ctrl-icon {
+  filter: invert(0.88);
+}
+
+.mapboxgl-ctrl-attrib {
+  background: rgba(17, 19, 22, 0.88) !important;
+  color: #7c8490 !important;
+  font-size: 9px !important;
+  font-family: var(--font-mono) !important;
+  border-radius: 0 !important;
+}
+
+.mapboxgl-ctrl-attrib a {
+  color: #a1a8b3 !important;
+}
+
+.mapboxgl-ctrl-attrib-button {
+  background-color: #171a1f !important;
+  filter: invert(0.8);
+}
+
+/* Range Input Calibration */
+input[type="range"] {
+  accent-color: #10b981;
+}

@@ -1,0 +1,6 @@
+{
+  "name": "TerraShift",
+  "description": "NASA Earth Trend Detective and Adaptive Crop Rotation Advisor combining 1990-2024 NASA POWER climate trends, SoilGrids profiles, and multi-year rotation modeling.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
