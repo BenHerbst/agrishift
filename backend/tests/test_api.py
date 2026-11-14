@@ -1,26 +1,3 @@
-import pandas as pd
-import pytest
-from fastapi.testclient import TestClient
-
-from app import main
-
-
-@pytest.fixture()
-def client(daily, monkeypatch):
-    """API with all outside data sources replaced by synthetic data (no network)."""
-    monkeypatch.setattr(main, "fetch_daily", lambda lat, lon: daily)
-    monkeypatch.setattr(main, "fetch_projections", lambda lat, lon: (None, [], []))
-    monkeypatch.setattr(main, "fetch_climate_indices", lambda: pd.DataFrame())
-    monkeypatch.setattr(main, "fetch_seasonal", lambda lat, lon, download=False: (None, "not downloaded"))
-    monkeypatch.setattr(main, "USE_PROPHET", False)
-    real = main.forecast_location
-    monkeypatch.setattr(main, "forecast_location", lambda *a, **kw: real(*a, **{**kw, "n_origins": 4, "n_boot": 3}))
-    monkeypatch.setattr(main, "load_station_data", lambda lat, lon: None)
-    main._clear_caches()
-    yield TestClient(main.app)
-    main._clear_caches()
-
-
 def test_endpoints(client):
     p = {"lat": 1.0, "lon": 2.0}
     assert client.get("/").status_code == 200

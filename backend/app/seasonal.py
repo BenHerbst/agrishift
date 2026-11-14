@@ -166,7 +166,7 @@ def fetch_seasonal(lat: float, lon: float, download: bool = True) -> Tuple[Optio
     """SEAS5 ensemble-mean monthly forecasts as a frame indexed by (start, lead). Returns (frame, error).
 
     With download=False only cached data is used – the CDS queue can take hours, so the API never waits
-    on it. Download with:  python scripts/download_seas5.py --lat 50.78 --lon 6.08
+    on it. Download with:  python scripts/download_copernicus.py --lat 50.78 --lon 6.08 --only seas5
     """
     if not cds_configured():
         return None, "no Copernicus CDS credentials (see app/seasonal.py)"
@@ -182,7 +182,7 @@ def fetch_seasonal(lat: float, lon: float, download: bool = True) -> Tuple[Optio
             continue
         if not download:
             errors.append(f"SEAS5 {years[0]}–{years[-1]} not downloaded yet "
-                          f"(run: python scripts/download_seas5.py --lat {lat} --lon {lon})")
+                          f"(run: python scripts/download_copernicus.py --lat {lat} --lon {lon} --only seas5)")
             continue
         raw = SEAS5_DIR / f"{key}.download"
         try:

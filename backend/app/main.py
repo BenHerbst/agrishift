@@ -6,6 +6,7 @@ Docs: http://127.0.0.1:8000/docs
 import os
 import threading
 import time
+from collections import OrderedDict
 from functools import lru_cache
 from typing import Dict, List, Optional, Tuple
 
@@ -13,15 +14,18 @@ import pandas as pd
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
+from . import cache as forecast_cache
 from .calibration import (
     CALIBRATABLE, apply_corrections, compute_corrections, delete_station_data, load_station_data, save_station_data,
 )
-from .data import RateLimited, fetch_climate_indices, fetch_daily, fetch_projections
+from .data import RateLimited, fetch_climate_indices
 from .ensemble import forecast_location
 from .features import MONTHLY_VARIABLES, to_monthly
 from .members import MAX_HORIZON_MONTHS, PROPHET_AVAILABLE
 from .risk import BASE_YEARS, RECENT_YEARS, seasonal_risk
 from .seasonal import fetch_seasonal
+from .soil import DEFAULT_ROOT_DEPTH_CM, fetch_soil, historical_water_stats, soil_profile
+from .sources import fetch_daily, fetch_projections
 
 # Meta Prophet as an extra ensemble member (on by default when installed; USE_PROPHET=0 disables)
 USE_PROPHET = PROPHET_AVAILABLE and os.environ.get("USE_PROPHET", "1") != "0"
@@ -49,6 +53,10 @@ app.add_middleware(
 
 LatQuery = Query(..., ge=-90, le=90, description="Latitude in decimal degrees")
 LonQuery = Query(..., ge=-180, le=180, description="Longitude in decimal degrees")
+RootDepthQuery = Query(DEFAULT_ROOT_DEPTH_CM, ge=20, le=100,
+                       description="Rooting depth in cm (e.g. lettuce 30, potato 50, wheat/maize 100)")
+KcQuery = Query(1.0, ge=0.1, le=1.5, description="Crop coefficient: crop water use = Kc × ET0 (1.0 = reference grass; "
+                                                  "maize/wheat mid-season ~1.15–1.2)")
 
 
 def _key(lat: float, lon: float) -> Tuple[float, float]:
@@ -61,42 +69,66 @@ def _daily(lat: float, lon: float) -> Tuple[pd.DataFrame, Dict]:
     daily = fetch_daily(lat, lon)
     station = load_station_data(lat, lon)
     corrections = compute_corrections(daily, station) if station is not None else {}
-    return (apply_corrections(daily, corrections) if corrections else daily), corrections
+    if corrections:
+        attrs = daily.attrs
+        daily = apply_corrections(daily, corrections)
+        daily.attrs = attrs  # keep the source label
+    return daily, corrections
 
 
-# A complete result is kept for the life of the process. A degraded one (some CMIP6 models failed,
-# e.g. Open-Meteo rate limit) is kept for DEGRADED_TTL_S only, so a later request retries the models
-# without every request in between re-training the whole ensemble.
+MEMORY_ENTRIES = 32
+_memory: "OrderedDict[str, Dict]" = OrderedDict()  # fingerprint key -> cache entry, newest last
+# A degraded result (some climate models failed, e.g. an Open-Meteo rate limit) is never written to
+# disk; it is kept in memory for DEGRADED_TTL_S only, so a later request retries the models without
+# every request in between re-training the whole ensemble.
 DEGRADED_TTL_S = float(os.environ.get("DEGRADED_CACHE_TTL_S", 900))
-_location_cache: Dict[Tuple[float, float], Tuple[Dict, Optional[float]]] = {}  # key -> (result, expiry or None)
+_degraded: Dict[Tuple[float, float], Tuple[float, Dict, Dict]] = {}  # location -> (expiry, result, cache info)
 _location_locks: Dict[Tuple[float, float], threading.Lock] = {}
 _locks_guard = threading.Lock()
 
 
-def _location(lat: float, lon: float) -> Dict:
-    key = (lat, lon)
+def _trained_until(daily: pd.DataFrame) -> str:
+    last = daily.index[-1]
+    month = last.to_period("M").to_timestamp()
+    if last != month + pd.offsets.MonthEnd(0):  # trailing partial month is not used for training
+        month -= pd.DateOffset(months=1)
+    return f"{month:%Y-%m}"
+
+
+def _remember(cache_key: str, entry: Dict):
+    _memory[cache_key] = entry
+    _memory.move_to_end(cache_key)
+    while len(_memory) > MEMORY_ENTRIES:
+        _memory.popitem(last=False)
+
+
+def _location(lat: float, lon: float, refresh: bool = False) -> Tuple[Dict, Dict]:
+    """Forecast for one location: from memory, else from the disk cache, else trained now.
+
+    Returns (result, cache info). `refresh=True` retrains even if a valid cached forecast exists.
+    One training run per location: concurrent requests (the frontend asks /agri-summary and /risk
+    in parallel) wait for it and then get the cached result instead of training again.
+    """
     with _locks_guard:
-        lock = _location_locks.setdefault(key, threading.Lock())
-    # One training run per location: concurrent requests (the frontend asks /agri-summary and /risk
-    # in parallel) wait for it instead of training the same ensemble several times at once.
+        lock = _location_locks.setdefault((lat, lon), threading.Lock())
     with lock:
-        cached = _location_cache.get(key)
-        if cached is not None and (cached[1] is None or cached[1] > time.monotonic()):
-            return cached[0]
-        result = _train_location(lat, lon)
-        degraded = bool(result["sources"]["climate_projection_errors"])
-        _location_cache[key] = (result, time.monotonic() + DEGRADED_TTL_S if degraded else None)
-        return result
+        return _cached_or_trained(lat, lon, refresh)
 
 
-def _train_location(lat: float, lon: float) -> Dict:
+def _cached_or_trained(lat: float, lon: float, refresh: bool) -> Tuple[Dict, Dict]:
+    if not refresh:
+        degraded = _degraded.get((lat, lon))
+        if degraded is not None and degraded[0] > time.monotonic():
+            return degraded[1], degraded[2]
     daily, corrections = _daily(lat, lon)
     projections, cmip_models, cmip_errors = fetch_projections(lat, lon)
     indices = fetch_climate_indices()
     seasonal, seasonal_error = fetch_seasonal(lat, lon, download=False)
-    result = forecast_location(daily, projections, indices, use_prophet=USE_PROPHET, seasonal=seasonal)
-    result["sources"] = {
-        "history": "Open-Meteo Historical API (ERA5/ERA5-Land reanalysis), 1980 onwards",
+    sources = {
+        "history": daily.attrs.get("label", "unknown"),
+        "history_source": daily.attrs.get("source"),
+        "history_period": f"{daily.index[0]:%Y-%m} – {daily.index[-1]:%Y-%m}",
+        "history_sources_skipped": daily.attrs.get("skipped") or None,
         "prophet_member": USE_PROPHET,
         "seasonal_forecast": (
             f"ECMWF SEAS5 via Copernicus, starts {seasonal.index.get_level_values(0).min():%Y-%m} – "
@@ -110,12 +142,41 @@ def _train_location(lat: float, lon: float) -> Dict:
             c: indices[c].dropna().index[-1].strftime("%Y-%m") for c in indices.columns if indices[c].notna().any()
         } or None,
     }
-    return result
+    fingerprint = {"lat": lat, "lon": lon, "trained_until": _trained_until(daily), "code": forecast_cache.CODE_VERSION,
+                   "sources": sources, "corrections": corrections}
+    cache_key = forecast_cache.key(fingerprint)
+
+    if not refresh:
+        if cache_key in _memory:
+            _memory.move_to_end(cache_key)
+            return _memory[cache_key]["result"], {"status": "memory", "created": _memory[cache_key]["created"]}
+        entry = forecast_cache.load(lat, lon, fingerprint)
+        if entry is not None:
+            _remember(cache_key, entry)
+            return entry["result"], {"status": "disk", "created": entry["created"]}
+
+    result = forecast_location(daily, projections, indices, use_prophet=USE_PROPHET, seasonal=seasonal)
+    result["sources"] = sources
+    if cmip_errors:
+        info = {"status": f"memory only for {DEGRADED_TTL_S / 60:.0f} min (climate projections incomplete)",
+                "created": time.strftime("%Y-%m-%dT%H:%M:%S")}
+        _degraded[(lat, lon)] = (time.monotonic() + DEGRADED_TTL_S, result, info)
+        return result, info
+    entry = forecast_cache.save(lat, lon, fingerprint, result)
+    _remember(cache_key, entry)
+    return result, {"status": "computed", "created": entry["created"]}
+
+
+@lru_cache(maxsize=64)
+def _soil(lat: float, lon: float) -> Dict:
+    return fetch_soil(lat, lon)
 
 
 def _clear_caches():
+    """Forget everything held in memory (the disk cache is keyed by its inputs and stays valid)."""
     _daily.cache_clear()
-    _location_cache.clear()
+    _memory.clear()
+    _degraded.clear()
 
 
 def _upstream(fn, *args):
@@ -144,7 +205,7 @@ def root():
     return {
         "status": "ok",
         "docs": "/docs",
-        "endpoints": ["/variables", "/history", "/forecast", "/agri-summary", "/risk", "/calibration"],
+        "endpoints": ["/variables", "/history", "/forecast", "/agri-summary", "/risk", "/soil", "/calibration", "/cache"],
     }
 
 
@@ -182,19 +243,22 @@ def forecast(
     lon: float = LonQuery,
     years: int = Query(3, ge=1, le=3, description="Forecast horizon in years"),
     variables: Optional[str] = Query(None, description="Comma-separated, e.g. 'tmean,precip'. Default: all"),
+    refresh: bool = Query(False, description="Ignore the cached forecast and retrain (~25 s)"),
 ):
     """Monthly ensemble forecast with 80 % range, per-model values and out-of-sample backtest skill.
 
-    The first request for a new location downloads data and trains all models (~30–60 s).
+    The first request for a new location downloads data and trains all models (~1–2 min); after that the
+    forecast comes from the cache until a new month of data arrives.
     """
     names = _parse_variables(variables)
-    result = _upstream(_location, *_key(lat, lon))
+    result, cache_info = _upstream(_location, *_key(lat, lon), refresh)
     months = min(years * 12, MAX_HORIZON_MONTHS)
     return {
         "latitude": lat,
         "longitude": lon,
         "trained_until": result["trained_until"],
         "horizon_months": months,
+        "cache": cache_info,
         "sources": result["sources"],
         "variables": {
             name: {
@@ -212,10 +276,11 @@ def agri_summary(
     lat: float = LatQuery,
     lon: float = LonQuery,
     years: int = Query(3, ge=1, le=3),
+    refresh: bool = Query(False, description="Ignore the cached forecast and retrain (~25 s)"),
 ):
     """Per calendar year: key farming indicators vs. the 1991–2020 normal for the same months."""
     key = _key(lat, lon)
-    result = _upstream(_location, *key)
+    result, cache_info = _upstream(_location, *key, refresh)
     daily, _ = _daily(*key)
     df = to_monthly(daily)
     months = min(years * 12, MAX_HORIZON_MONTHS)
@@ -252,7 +317,7 @@ def agri_summary(
         entry["frost_free_months"] = int((block["frost_days"] < 0.5).sum())
         summary.append(entry)
 
-    return {"latitude": lat, "longitude": lon, "sources": result["sources"], "summary": summary}
+    return {"latitude": lat, "longitude": lon, "cache": cache_info, "sources": result["sources"], "summary": summary}
 
 
 @app.get("/risk")
@@ -260,6 +325,10 @@ def risk(
     lat: float = LatQuery,
     lon: float = LonQuery,
     years: int = Query(3, ge=1, le=3),
+    root_depth_cm: float = RootDepthQuery,
+    kc: float = KcQuery,
+    use_soil: bool = Query(True, description="Include soil water stress and soil-aware irrigation need"),
+    refresh: bool = Query(False, description="Ignore the cached forecast and retrain (~25 s)"),
 ):
     """Per season: probability of a dry, wet, drought, hot or frost season, and the irrigation need.
 
@@ -267,18 +336,61 @@ def risk(
     recently. For rain the forecast has little skill, so the main signal is the climate trend.
     """
     key = _key(lat, lon)
-    result = _upstream(_location, *key)
+    result, cache_info = _upstream(_location, *key, refresh)
     daily, _ = _daily(*key)
     months = min(years * 12, MAX_HORIZON_MONTHS)
     forecasts = {v: r["forecast"][:months] for v, r in result["variables"].items()}
+    soil, soil_info = None, None
+    if use_soil:
+        try:
+            profile = soil_profile(_soil(*key), root_depth_cm)
+            soil = {"taw_mm": profile["total_available_water_mm"], "kc": kc}
+            soil_info = {"texture_class": profile["texture_class"], "root_depth_cm": root_depth_cm, "kc": kc,
+                         "total_available_water_mm": profile["total_available_water_mm"]}
+        except Exception as exc:  # soil server down or no soil here → climate-only risk
+            soil_info = {"error": f"No soil data, soil water left out: {exc}"}
     return {
         "latitude": lat,
         "longitude": lon,
         "method": (f"Observed weather of {BASE_YEARS[0]}–{BASE_YEARS[1]} shifted by the forecast → 30 possible "
                    f"outcomes per season; thresholds from {BASE_YEARS[0]}–{BASE_YEARS[1]}; "
                    f"'observed_last_{RECENT_YEARS}_years' shows what actually happened recently"),
+        "cache": cache_info,
         "sources": result["sources"],
-        "seasons": seasonal_risk(daily, forecasts),
+        "soil": soil_info,
+        "seasons": seasonal_risk(daily, forecasts, soil),
+    }
+
+
+@app.get("/soil")
+def soil(
+    lat: float = LatQuery,
+    lon: float = LonQuery,
+    root_depth_cm: float = RootDepthQuery,
+    kc: float = KcQuery,
+):
+    """The soil at this location (ISRIC SoilGrids, 250 m) and what it means for crops.
+
+    Texture, organic matter, pH, nutrient storage and plant-available water in the root zone, plus a
+    daily soil water balance on the observed weather: days of water stress for a rain-fed crop and the
+    irrigation need per year – then vs. now – and today's soil water status.
+    """
+    key = _key(lat, lon)
+    try:
+        raw = _soil(*key)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Could not load soil data: {exc}")
+    profile = soil_profile(raw, root_depth_cm)
+    daily, _ = _upstream(_daily, *key)
+    return {
+        "latitude": lat,
+        "longitude": lon,
+        "source": raw["source"],
+        "search_radius_km": raw["search_radius_km"],
+        "profile": profile,
+        "water": historical_water_stats(daily, profile["total_available_water_mm"], kc),
+        "layers": raw["layers"],
+        "units": raw["units"],
     }
 
 
@@ -314,4 +426,20 @@ def get_calibration(lat: float = LatQuery, lon: float = LonQuery):
 def remove_calibration(lat: float = LatQuery, lon: float = LonQuery):
     removed = delete_station_data(lat, lon)
     _clear_caches()
+    return {"removed": removed}
+
+
+@app.get("/cache")
+def list_cache():
+    """Forecasts stored on disk. `current_code: false` entries were made by older model code and are never reused."""
+    return {"code_version": forecast_cache.CODE_VERSION, "in_memory": len(_memory), "entries": forecast_cache.entries()}
+
+
+@app.delete("/cache")
+def clear_cache(lat: Optional[float] = Query(None, ge=-90, le=90), lon: Optional[float] = Query(None, ge=-180, le=180)):
+    """Delete cached forecasts – for one location (lat + lon) or all."""
+    if (lat is None) != (lon is None):
+        raise HTTPException(status_code=400, detail="Give both lat and lon, or neither to clear everything.")
+    removed = forecast_cache.clear(*_key(lat, lon)) if lat is not None else forecast_cache.clear()
+    _memory.clear()
     return {"removed": removed}

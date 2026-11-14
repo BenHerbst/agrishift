@@ -1,8 +1,11 @@
-"""Data sources, all cached on disk under data_cache/.
+"""Open-Meteo and NOAA data, all cached on disk under data_cache/.
 
-* Observations:       Open-Meteo Historical API (ERA5 / ERA5-Land reanalysis), daily, 1980 → last full month.
-* Climate projections: Open-Meteo Climate API (CMIP6 HighResMIP, ~10–50 km), daily 2000–2040, stored monthly.
-* Climate drivers:    NOAA monthly indices – ENSO (Niño 3.4), NAO, PDO.
+* Observations (fallback):        Open-Meteo Historical API (ERA5 / ERA5-Land), daily, 1980 → last full month.
+* Climate projections (fallback): Open-Meteo Climate API (CMIP6 HighResMIP, ~10–50 km), daily 2000–2040, stored monthly.
+* Climate drivers:                NOAA monthly indices – ENSO (Niño 3.4), NAO, PDO.
+
+The primary sources (ERA5-Land and CMIP6 from Copernicus, NASA POWER) and the fallback order live in
+sources.py. DAILY_VARS defines the daily columns every weather source delivers.
 
 Open-Meteo's free tier counts long requests as many calls (≈1 call per 2 weeks of data). One new
 location costs roughly 1,300 calls for the history plus ~1,100 per climate model, against a limit of
@@ -95,7 +98,7 @@ def _last_complete_month_end() -> date:
     return first_of_this_month - timedelta(days=1)
 
 
-def fetch_daily(lat: float, lon: float, start: str = HISTORY_START, end: Optional[str] = None) -> pd.DataFrame:
+def fetch_open_meteo_daily(lat: float, lon: float, start: str = HISTORY_START, end: Optional[str] = None) -> pd.DataFrame:
     """Daily reanalysis history. Only columns missing from the cache are downloaded."""
     lat, lon = round(lat, 2), round(lon, 2)
     end = end or _last_complete_month_end().isoformat()
@@ -125,7 +128,7 @@ def _cmip_monthly(daily: pd.DataFrame) -> pd.DataFrame:
     return monthly
 
 
-def fetch_projections(lat: float, lon: float) -> Tuple[Optional[pd.DataFrame], List[str], List[str]]:
+def fetch_open_meteo_projections(lat: float, lon: float) -> Tuple[Optional[pd.DataFrame], List[str], List[str]]:
     """Monthly CMIP6 multi-model mean. Returns (frame or None, models used, errors)."""
     lat, lon = round(lat, 2), round(lon, 2)
     CACHE_DIR.mkdir(exist_ok=True)

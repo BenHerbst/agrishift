@@ -19,12 +19,13 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from app.data import fetch_climate_indices, fetch_daily, fetch_projections  # noqa: E402
+from app.data import fetch_climate_indices  # noqa: E402
 from app.ensemble import forecast_location  # noqa: E402
 from app.features import MONTHLY_VARIABLES, to_monthly  # noqa: E402
 from app.members import MAX_HORIZON_MONTHS, PROPHET_AVAILABLE  # noqa: E402
 from app.risk import SEASONS, _season_totals, event_occurred, seasonal_risk  # noqa: E402
 from app.seasonal import fetch_seasonal  # noqa: E402
+from app.sources import fetch_daily, fetch_projections  # noqa: E402
 
 OUTPUT_DIR = ROOT / "outputs"
 ANNUAL_KEYS = ["tmean", "precip", "gdd", "frost_days", "heat_days", "water_balance", "soil_moisture_root"]
@@ -35,6 +36,7 @@ def run_hindcast(lat: float, lon: float, start: str, use_prophet: bool):
     projections, cmip_models, cmip_errors = fetch_projections(lat, lon)
     indices = fetch_climate_indices()
     seasonal, _ = fetch_seasonal(lat, lon, download=False)
+    print(f"Weather history: {daily.attrs.get('label')} ({daily.index[0]:%Y-%m} – {daily.index[-1]:%Y-%m})")
     print(f"Climate projections: {cmip_models or 'none'}" + (f" (errors: {cmip_errors})" if cmip_errors else ""))
     print(f"SEAS5: {'cached, used' if seasonal is not None else 'not downloaded, skipped'} | Prophet: {use_prophet}")
     actual = to_monthly(daily)

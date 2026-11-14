@@ -2,7 +2,8 @@
 
 A FastAPI service that forecasts **monthly farming-relevant weather 1–3 years ahead** for any location on Earth.
 It covers temperature, growing degree days, frost and heat days, rain, crop water demand, water balance and soil moisture.
-It also gives **seasonal risk probabilities** (dry, wet, drought, hot and frost seasons) and the expected irrigation need.
+It also gives **seasonal risk probabilities** (dry, wet, drought, hot and frost seasons), and it takes the **soil of the field** into account:
+water storage, water stress for rain-fed crops and the irrigation need.
 
 > **What this can and can't do:** day-to-day weather is chaotic, and nobody can forecast whether it rains on 14 June 2028.
 > What *can* be estimated years ahead is the **expected monthly climate** (seasonal cycle, warming trend, slow climate drivers such as El Niño)
@@ -20,12 +21,14 @@ It also gives **seasonal risk probabilities** (dry, wet, drought, hot and frost 
 5. [How it works](#how-it-works)
 6. [Accuracy](#accuracy-tested-on-20202026)
 7. [Optional: seasonal forecasts (ECMWF SEAS5)](#optional-seasonal-forecasts-ecmwf-seas5)
-8. [Optional: your own weather station](#optional-your-own-weather-station)
-9. [Testing and hindcasts](#testing-and-hindcasts)
-10. [Project structure](#project-structure)
-11. [Configuration](#configuration)
-12. [Limits and next steps](#limits-and-next-steps)
-13. [Data licences and attribution](#data-licences-and-attribution)
+8. [Soil](#soil)
+9. [Optional: your own weather station](#optional-your-own-weather-station)
+10. [Caching](#caching)
+11. [Testing and hindcasts](#testing-and-hindcasts)
+12. [Project structure](#project-structure)
+13. [Configuration](#configuration)
+14. [Limits and next steps](#limits-and-next-steps)
+15. [Data licences and attribution](#data-licences-and-attribution)
 
 ---
 
@@ -49,7 +52,8 @@ curl "http://127.0.0.1:8000/forecast?lat=50.78&lon=6.08&years=1&variables=tmean,
 ```
 
 **Timing:** the first request for a new location downloads about 45 years of data and trains all models, which takes about 1–2 minutes.
-After that, training takes about 25 s from the disk cache (Apple M4, all cores), and repeat requests return instantly from memory.
+After that, the finished forecast is [cached](#caching) on disk and in memory, so later requests take about 0.05 s, even after a server restart.
+It stays cached until a new month of data arrives.
 
 ---
 
@@ -61,12 +65,18 @@ After that, training takes about 25 s from the disk cache (Apple M4, all cores),
 | `GET /history?lat=&lon=&start_year=2010&variables=precip,gdd` | Observed monthly values (station-calibrated if a station was uploaded) |
 | `GET /forecast?lat=&lon=&years=3&variables=tmean,precip` | Monthly forecast with 80 % range, each model's value, backtest skill and model weights |
 | `GET /agri-summary?lat=&lon=&years=3` | Per year: GDD, rain, ET0, water balance, frost/heat/wet days and root-zone moisture vs. the 1991–2020 normal, deficit months, frost-free months |
-| `GET /risk?lat=&lon=&years=3` | Per season: probability of a dry / wet / drought / hot / frost season vs. normal odds and the last 15 years, plus irrigation need (typical, 1-in-5 and 1-in-10 year) |
+| `GET /risk?lat=&lon=&years=3&root_depth_cm=100&kc=1.15` | Per season: probability of a dry / wet / drought / hot / frost / **water-stress** season vs. normal odds and the last 15 years, plus the **soil-aware irrigation need** (typical, 1-in-5 and 1-in-10 year) |
+| `GET /soil?lat=&lon=&root_depth_cm=100&kc=1.0` | The soil at the field: texture, organic matter, pH, CEC, layers, **plant-available water**, plain-language notes, and stress days / irrigation need per year (1991–2020 vs. last 10 years) |
 | `POST /calibration?lat=&lon=` | Upload daily station data (CSV) to calibrate a location |
 | `GET /calibration?lat=&lon=` | Show the corrections applied |
 | `DELETE /calibration?lat=&lon=` | Remove station data |
+| `GET /cache` | Forecasts stored on disk, with their data month and whether they match the current model code |
+| `DELETE /cache?lat=&lon=` | Delete cached forecasts for one location (or all, without parameters) |
 
-Every forecast response has a `sources` block listing what was actually used: climate models, index dates, SEAS5, station calibration and Prophet.
+`/forecast`, `/agri-summary` and `/risk` take `refresh=true` to retrain even when a valid cached forecast exists.
+
+Every forecast response has a `sources` block listing what was actually used (climate models, index dates, SEAS5, station calibration, Prophet)
+and a `cache` block (`computed`, `disk` or `memory`, plus when the forecast was created).
 
 **Example `/forecast` month:**
 
@@ -108,19 +118,50 @@ Every forecast response has a `sources` block listing what was actually used: cl
 
 ## Data sources
 
-All sources are free and cached on disk in `data_cache/`.
+All sources are free and cached on disk in `data_cache/`. Every response's `sources` block says which one was used.
+
+**Weather history**, tried in this order (`WEATHER_SOURCES`):
+
+| # | Source | Resolution / period | How it is loaded |
+|---|---|---|---|
+| 1 | [ERA5-Land](https://cds.climate.copernicus.eu/datasets/reanalysis-era5-land-timeseries) from the **Copernicus Climate Data Store** (hourly → local days, ET0 computed with FAO-56) | ~9 km, 1980 → ~6 days ago | `scripts/download_copernicus.py` (needs a Copernicus account). The API only reads the cache |
+| 2 | [NASA POWER](https://power.larc.nasa.gov) (MERRA-2 / CERES, ET0 computed with FAO-56) | ~50 km, 1984 → ~7 days ago | On demand, in a few seconds, no key |
+| 3 | [Open-Meteo Historical API](https://open-meteo.com/en/docs/historical-weather-api) (ERA5 / ERA5-Land) | ~10–25 km, 1980 → | On demand. Last resort, because of the free-tier rate limits |
+
+**Climate projections** (`PROJECTION_SOURCES`):
+
+| # | Source | Models | How it is loaded |
+|---|---|---|---|
+| 1 | [CMIP6](https://cds.climate.copernicus.eu/datasets/projections-cmip6) from the **Copernicus Climate Data Store**, historical + SSP2-4.5, monthly | MRI-ESM2.0, CNRM-CM6-1-HR, IPSL-CM6A-LR | `scripts/download_copernicus.py`, per 5° region (shared by all locations in it) |
+| 2 | [Open-Meteo Climate API](https://open-meteo.com/en/docs/climate-api) (CMIP6 HighResMIP) | EC-Earth3P-HR, MPI-ESM1.2-XR, MRI-AGCM3.2-S | On demand |
+
+**Other sources:**
 
 | Source | What | Used for |
 |---|---|---|
-| [Open-Meteo Historical API](https://open-meteo.com/en/docs/historical-weather-api) | ERA5 / ERA5-Land reanalysis, daily, 1980 → last full month, ~10–25 km | Training history for every variable |
-| [Open-Meteo Climate API](https://open-meteo.com/en/docs/climate-api) | CMIP6 HighResMIP projections (EC-Earth3P-HR, MPI-ESM1.2-XR, MRI-AGCM3.2-S), 2000–2040 | Projected warming and drying per calendar month |
 | NOAA CPC / NCEI | Monthly ENSO (Niño 3.4), NAO, PDO indices | `climate_drivers` model |
-| [Copernicus CDS](https://cds.climate.copernicus.eu/datasets/seasonal-monthly-single-levels) *(optional)* | ECMWF SEAS5 seasonal forecasts, lead months 1–6, archive from 1993 | `seasonal_forecast` model |
-| Your weather station *(optional)* | Daily CSV upload | Corrects the reanalysis toward local conditions |
+| [ECMWF SEAS5](https://cds.climate.copernicus.eu/datasets/seasonal-monthly-single-levels) from Copernicus *(optional)* | Seasonal forecasts, lead months 1–6, archive from 1993 | `seasonal_forecast` model |
+| [ISRIC SoilGrids 2.0](https://soilgrids.org) | Soil properties, 250 m, 0–100 cm | `/soil`, and soil water in `/risk` |
+| Your weather station *(optional)* | Daily CSV upload | Corrects the weather history toward local conditions |
 
-**Open-Meteo rate limits:** on the free tier, a new location costs about 4,500 API calls (history plus 3 climate models).
-The limits are 5,000 calls per hour and 10,000 per day, so expect about 2 new locations per day. Cached locations cost nothing.
-For production, set `OPEN_METEO_API_KEY`.
+When ERA5-Land or CMIP6 arrive for a location, its forecasts are **retrained automatically**: the source is part of the cache fingerprint.
+Run the download script monthly (e.g. from cron) to keep ERA5-Land and SEAS5 up to date.
+
+### Copernicus account
+
+1. Create a free account at https://cds.climate.copernicus.eu
+2. Accept the licences of the datasets you use, on each dataset page under **Download → Terms of use**:
+   ERA5-Land and CMIP6 (*CMIP6 – Data Access – Terms of Use*); for SEAS5, *CC-BY 4.0* and *Additional licence to use non-European contributions*
+3. Put your API token (profile page) in `~/.cdsapirc`:
+   ```
+   url: https://cds.climate.copernicus.eu/api
+   key: <your-token>
+   ```
+4. Download a location:
+   ```bash
+   python scripts/download_copernicus.py --lat 50.84 --lon 6.13                  # era5land, cmip6 and seas5
+   python scripts/download_copernicus.py --lat 50.84 --lon 6.13 --only era5land   # just one of them
+   ```
 
 ---
 
@@ -220,22 +261,45 @@ Configuration: the defaults used by the API (with Prophet, without SEAS5). The f
 ## Optional: seasonal forecasts (ECMWF SEAS5)
 
 SEAS5 is a physical ocean–atmosphere model started from the observed state every month. It is expected to help mostly in months 1–6.
-
-1. Create a free account at https://cds.climate.copernicus.eu
-2. Accept the dataset licences: on the [dataset page](https://cds.climate.copernicus.eu/datasets/seasonal-monthly-single-levels?tab=download), scroll to **Terms of use**
-   (*CC-BY 4.0* and *Additional licence to use non-European contributions*)
-3. Put your API token (profile page) in `~/.cdsapirc`:
-   ```
-   url: https://cds.climate.copernicus.eu/api
-   key: <your-token>
-   ```
-4. Download the archive for a location. This runs outside the API because the CDS queue can take hours:
-   ```bash
-   python scripts/download_seas5.py --lat 50.78 --lon 6.08
-   ```
+Set up the [Copernicus account](#copernicus-account), then run `python scripts/download_copernicus.py --lat … --lon … --only seas5`.
 
 The API only uses SEAS5 data that is already downloaded, so it never waits on the queue. The model joins the ensemble only once
 forecasts exist for every backtest origin, so its weight is always learned from a fair test.
+
+---
+
+## Soil
+
+The soil decides how long crops can bridge a dry spell, so the same weather means very different water stress on sand and on loess.
+
+**Where the data comes from:** ISRIC SoilGrids 2.0, at 250 m resolution worldwide. It is read through the SoilGrids map service (WCS), because the
+SoilGrids point API currently returns no data. For each property and layer, the median of the soil pixels within about 1 km is used.
+Towns, roads and water have no soil data, so the search widens to about 3 and then 6 km. The radius used is in the response.
+**Give the coordinates of the actual field:** a point in a town picks up soil from parks or forest at its edge.
+
+**What is derived:**
+- **Texture class** (USDA soil triangle), organic matter (= organic carbon × 1.724), pH, CEC and bulk density of the topsoil (0–30 cm)
+- **Total available water (TAW)** in the root zone: Σ (field capacity − wilting point) × (1 − gravel) × layer thickness.
+  It uses SoilGrids' own water-retention layers, or the Saxton & Rawls (2006) pedotransfer functions where those are missing.
+- **Notes:** water storage, drainage and workability (clay), leaching (sand), liming need (pH), low organic matter, low CEC
+
+**Soil water balance (FAO-56, daily):** the root zone is a bucket of size TAW. Rain fills it and crop evapotranspiration (Kc × ET0) empties it.
+Once the depletion passes RAW = 0.5 × TAW the crop is under water stress, and actual ET drops. The irrigated run refills the bucket at that point,
+and the sum of those refills is the irrigation need.
+
+**What this changes:**
+
+| | Aachen (silt loam) | Lubbock, Texas (sandy clay loam) |
+|---|---|---|
+| Plant-available water, 0–100 cm | 156 mm (high) | 120 mm (medium) |
+| Irrigation need per year with soil storage, 1991–2020 (Kc 1.0, all year) | **178 mm** (last 10 years: 265 mm) | 1,414 mm |
+| The same, ignoring the soil (Σ ET0 − rain) | 476 mm | 1,613 mm |
+
+**In `/risk`:**
+- Every one of the 30 outcomes per season runs through the water balance and starts from the soil moisture that year actually had on that date.
+- **The first forecast season starts from today's soil moisture**, carried through the months in between with each year's weather, so a dry soil now raises the risk.
+- Set `root_depth_cm` and `kc` for your crop, for example lettuce 30 cm / 1.0, potato 50 cm / 1.15, wheat or maize 100 cm / 1.15 mid-season.
+  Kc is applied to every season, so only read the seasons your crop is actually in the field.
 
 ---
 
@@ -259,10 +323,38 @@ Each column needs at least 365 days that overlap 1980 → today.
 
 ---
 
+## Caching
+
+Downloaded data and finished forecasts are both cached, so nothing is downloaded or trained twice.
+
+| What | Where | Valid until |
+|---|---|---|
+| Weather history (ERA5-Land, NASA POWER, Open-Meteo), CMIP6, SEAS5 | `data_cache/era5land/`, `nasa_power/`, `*.csv`, `cmip6/`, `seas5/` | Forever. Only new days or missing columns are downloaded |
+| Climate indices (ENSO/NAO/PDO) | `data_cache/climate_indices.csv` | Re-downloaded after 3 days |
+| Soil (SoilGrids) | `data_cache/soil/*.json` | Forever (soil doesn't change) |
+| **Finished forecasts** | `data_cache/forecasts/*.json` + memory (32 most recent) | **As long as nothing they depend on changes** |
+
+A forecast is only reused if all of these are unchanged:
+- the location
+- the **last data month** (a new month means a new forecast)
+- the **model code** (a hash of the model files, so editing them invalidates old entries automatically)
+- the inputs: climate models used, SEAS5 coverage, station calibration, latest climate-index month, Prophet on/off
+
+Files are written atomically, unreadable files are recomputed, and only the newest 2 entries per location are kept (about 220 KB each).
+Forecasts built with incomplete climate data (e.g. an Open-Meteo rate limit) are never cached.
+
+Pre-compute forecasts, for example after the start of a month or before a demo:
+
+```bash
+python scripts/warm_cache.py --location 50.78,6.08 --location 33.58,-101.85
+```
+
+---
+
 ## Testing and hindcasts
 
 ```bash
-python -m pytest                        # 12 offline tests on synthetic data, ~10 s, no internet needed
+python -m pytest                        # 36 offline tests on synthetic data, ~35 s, no internet needed
 
 python scripts/hindcast.py --lat 50.78 --lon 6.08 --start 2020-01 --name aachen
 ```
@@ -283,18 +375,26 @@ backend/
 ├── requirements.txt
 ├── pytest.ini
 ├── app/
-│   ├── main.py          FastAPI endpoints and caching
-│   ├── data.py          Open-Meteo history and CMIP6, NOAA climate indices
+│   ├── main.py          FastAPI endpoints
+│   ├── cache.py         disk cache for finished forecasts
+│   ├── sources.py       which source is used: primary sources with automatic fallback
+│   ├── era5land.py      ERA5-Land history from Copernicus
+│   ├── nasa_power.py    NASA POWER history
+│   ├── cmip6.py         CMIP6 projections from Copernicus
+│   ├── et0.py           FAO-56 Penman-Monteith ET0
+│   ├── data.py          Open-Meteo history and projections (fallback), NOAA climate indices
 │   ├── seasonal.py      Copernicus SEAS5 download, parsing and bias correction
 │   ├── calibration.py   weather-station corrections
 │   ├── features.py      agricultural indicators and monthly aggregation
+│   ├── soil.py          SoilGrids soil profile, available water, FAO-56 soil water balance
 │   ├── members.py       statistical / ML models (climatology … Prophet)
 │   ├── projections.py   CMIP6 projection, anchored projection, SEAS5 model
 │   ├── ensemble.py      rolling backtest, stacking weights, 80 % ranges
 │   └── risk.py          seasonal risk probabilities and irrigation need
 ├── scripts/
 │   ├── hindcast.py      accuracy test against real data
-│   └── download_seas5.py
+│   ├── download_copernicus.py   ERA5-Land, CMIP6 and SEAS5 download / monthly update
+│   └── warm_cache.py    pre-compute forecasts
 ├── tests/               offline tests on synthetic weather
 └── outputs/             hindcast results for Aachen and Lubbock
 ```
@@ -305,8 +405,12 @@ backend/
 
 | Environment variable | Default | Effect |
 |---|---|---|
+| `WEATHER_SOURCES` | `era5land,nasa_power,open_meteo` | Weather sources in fallback order |
+| `PROJECTION_SOURCES` | `cds_cmip6,open_meteo` | Projection sources in fallback order |
+| `CDS_CMIP6_MODELS` | `mri_esm2_0,cnrm_cm6_1_hr,ipsl_cm6a_lr` | CMIP6 models from Copernicus |
+| `CDS_CMIP6_SCENARIO` | `ssp2_4_5` | CMIP6 scenario (e.g. `ssp5_8_5`) |
 | `OPEN_METEO_API_KEY` | unset | Use the commercial Open-Meteo endpoints (no free-tier limits) |
-| `CMIP_MODELS` | `EC_Earth3P_HR,MPI_ESM1_2_XR,MRI_AGCM3_2_S` | Climate models for the projections (each new one costs about 1,100 API calls per location) |
+| `CMIP_MODELS` | `EC_Earth3P_HR,MPI_ESM1_2_XR,MRI_AGCM3_2_S` | Open-Meteo climate models (fallback) |
 | `USE_PROPHET` | `1` | `0` leaves Meta Prophet out of the ensemble |
 | `CDSAPI_URL` / `CDSAPI_KEY` | from `~/.cdsapirc` | Copernicus credentials for SEAS5 |
 
@@ -317,12 +421,17 @@ backend/
 - **Rain is not predictable years ahead** in most climates. That's a limit of the atmosphere, not of the code. Use `/risk` and the 80 % ranges.
 - **Cold bias:** see [Accuracy](#accuracy-tested-on-20202026). SEAS5 is the most promising fix for the first 6 months.
 - **Uncertainty ranges** are slightly too narrow for wind (59 % in Texas) and topsoil moisture (about 66 %).
-- **Crop-specific outputs** (sowing windows, frost after budburst, irrigation need with crop coefficients) are the natural next step.
+- **Soil water balance** ignores runoff, capillary rise and groundwater, and uses one Kc for the whole year. SoilGrids is a 250 m model map, so a soil sample from the field is better.
+- **Crop-specific outputs** (crop calendar with Kc per growth stage, sowing windows, frost after budburst) are the natural next step.
 
 ---
 
 ## Data licences and attribution
 
+All sources (data, scientific methods, software) with full citations: **[QUELLEN.md](QUELLEN.md)**.
+
+
 - Weather and climate data by **[Open-Meteo.com](https://open-meteo.com/)** ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)), based on ERA5 / ERA5-Land (Copernicus Climate Change Service) and CMIP6 HighResMIP.
 - SEAS5: *Generated using Copernicus Climate Change Service information*. Neither the European Commission nor ECMWF is responsible for any use of this information.
 - Climate indices: NOAA Climate Prediction Center and NCEI (public domain).
+- Soil: ISRIC SoilGrids 2.0 ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)), Poggio et al. (2021), *SOIL* 7, 217–240.
