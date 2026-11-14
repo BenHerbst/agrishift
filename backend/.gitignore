@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Downloaded / cached data (re-created automatically on first request)
+data_cache/
+
+# Secrets
+.env
+.cdsapirc
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
