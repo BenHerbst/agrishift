@@ -12,6 +12,7 @@ from sklearn.linear_model import RidgeCV
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
+from threadpoolctl import threadpool_limits
 
 try:
     logging.getLogger("prophet.plot").disabled = True  # "Importing plotly failed" – plots aren't used
@@ -104,10 +105,12 @@ class BoostedAnomaly:
     def fit(self, y: pd.Series) -> "BoostedAnomaly":
         self.trend = TrendClimatology().fit(y)
         self.resid = y - self.trend.predict(y.index)
-        self.gbm = HistGradientBoostingRegressor(
-            max_iter=150, learning_rate=0.03, max_depth=3, min_samples_leaf=30,
-            l2_regularization=1.0, random_state=0,
-        ).fit(self._features(y.index), self.resid.values)
+        # ~500 monthly rows: OpenMP thread start-up costs far more than the fit itself
+        with threadpool_limits(1):
+            self.gbm = HistGradientBoostingRegressor(
+                max_iter=150, learning_rate=0.03, max_depth=3, min_samples_leaf=30,
+                l2_regularization=1.0, random_state=0,
+            ).fit(self._features(y.index), self.resid.values)
         return self
 
     def _features(self, idx: pd.DatetimeIndex) -> pd.DataFrame:
@@ -121,7 +124,8 @@ class BoostedAnomaly:
         return X.loc[idx]
 
     def predict(self, idx: pd.DatetimeIndex) -> np.ndarray:
-        return self.trend.predict(idx) + self.gbm.predict(self._features(idx))
+        with threadpool_limits(1):
+            return self.trend.predict(idx) + self.gbm.predict(self._features(idx))
 
 
 class ProphetForecaster:

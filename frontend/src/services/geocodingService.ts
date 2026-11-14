@@ -147,7 +147,8 @@ export async function reverseGeocode(
     const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat.toFixed(
       4
     )}&lon=${lon.toFixed(4)}&zoom=10&accept-language=${lang}`;
-    const res = await fetch(url, { signal: controller.signal });
+    // Disk-cached by the Express server (server.ts, /api/cached)
+    const res = await fetch(`/api/cached?url=${encodeURIComponent(url)}`, { signal: controller.signal });
     if (!res.ok) return coordFallback;
     const json = (await res.json()) as {
       address?: {

@@ -38,6 +38,10 @@ interface SoilGridsResponse {
   };
 }
 
+// Goes through the Express server's disk cache (server.ts, /api/cached), so a location that was
+// visited once loads instantly afterwards.
+const cached = (url: string) => `/api/cached?url=${encodeURIComponent(url)}`;
+
 async function fetchWithTimeout(url: string, timeoutMs: number, externalSignal?: AbortSignal): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -99,7 +103,7 @@ async function fetchNasaPower(
   const url = `https://power.larc.nasa.gov/api/temporal/monthly/point?parameters=T2M,PRECTOTCORR,GWETROOT,EVLAND&community=AG&longitude=${lon.toFixed(4)}&latitude=${lat.toFixed(4)}&start=1990&end=2025&format=JSON`;
 
   try {
-    const res = await fetchWithTimeout(url, TIMEOUT_MS, signal);
+    const res = await fetchWithTimeout(cached(url), TIMEOUT_MS, signal);
     const latencyMs = Math.round(performance.now() - start);
     if (!res.ok) {
       return { recordsByVariable: fallbackRecords, source: 'fallback', latencyMs };
@@ -163,7 +167,7 @@ async function fetchSoilGrids(
   const url = `https://rest.isric.org/soilgrids/v2.0/properties/query?lon=${lon.toFixed(4)}&lat=${lat.toFixed(4)}&property=phh2o&property=soc&property=clay&property=sand&depth=0-30cm&value=mean`;
 
   try {
-    const res = await fetchWithTimeout(url, TIMEOUT_MS, signal);
+    const res = await fetchWithTimeout(cached(url), TIMEOUT_MS, signal);
     const latencyMs = Math.round(performance.now() - start);
     if (!res.ok) {
       return { ...fallbackSoil, source: 'fallback', latencyMs };

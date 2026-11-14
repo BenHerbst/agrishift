@@ -1,5 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
+import { createHash } from 'node:crypto';
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { createServer as createHttpServer } from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,6 +18,32 @@ const PORT = Number(process.env.PORT ?? 3000);
 const BACKEND_URL = (process.env.BACKEND_URL ?? 'http://127.0.0.1:8000').replace(/\/+$/, '');
 // The first request for a new location downloads ~45 years of data and trains all models (1–2 min).
 const BACKEND_TIMEOUT_MS = Number(process.env.BACKEND_TIMEOUT_MS ?? 240_000);
+
+// Disk cache for third-party data the browser would otherwise re-download on every visit
+// (NASA POWER, SoilGrids, reverse geocoding) and for the Gemini briefing. Locations visited
+// once load instantly afterwards, in any browser and across server restarts.
+const CACHE_DIR = path.join(__dirname, '.cache');
+const CACHEABLE_HOSTS = new Set(['power.larc.nasa.gov', 'rest.isric.org', 'nominatim.openstreetmap.org']);
+const UPSTREAM_TIMEOUT_MS = 60_000;
+
+function cachePath(kind: string, key: string): string {
+  return path.join(CACHE_DIR, kind, `${createHash('sha256').update(key).digest('hex').slice(0, 24)}.json`);
+}
+
+async function readCache(file: string): Promise<string | null> {
+  try {
+    return await readFile(file, 'utf8');
+  } catch {
+    return null;
+  }
+}
+
+async function writeCache(file: string, body: string): Promise<void> {
+  await mkdir(path.dirname(file), { recursive: true });
+  const tmp = `${file}.${process.pid}.tmp`;
+  await writeFile(tmp, body);
+  await rename(tmp, file); // atomic: a crash never leaves half a file behind
+}
 
 function buildDeterministicBriefing(payload: AgroBriefingRequest): AgroBriefingResponse {
   const { lang = 'en', regionName, lat, lon, seasonalWindow, soil, statsByVariable, priorities, recommendedScenario } = payload;
@@ -225,6 +253,44 @@ async function startServer() {
     }
   });
 
+  // GET /api/cached?url=<encoded upstream URL>: only successful JSON responses are stored, so a
+  // failed request is retried next time instead of being cached.
+  app.get('/api/cached', async (req, res) => {
+    const raw = typeof req.query.url === 'string' ? req.query.url : '';
+    let upstreamUrl: URL;
+    try {
+      upstreamUrl = new URL(raw);
+    } catch {
+      res.status(400).json({ error: 'Missing or invalid url parameter.' });
+      return;
+    }
+    if (upstreamUrl.protocol !== 'https:' || !CACHEABLE_HOSTS.has(upstreamUrl.hostname)) {
+      res.status(403).json({ error: `Host not allowed: ${upstreamUrl.hostname}` });
+      return;
+    }
+    const file = cachePath('http', upstreamUrl.href);
+    const cached = await readCache(file);
+    if (cached !== null) {
+      res.type('application/json').setHeader('x-cache', 'hit').send(cached);
+      return;
+    }
+    try {
+      const upstream = await fetch(upstreamUrl, {
+        headers: { accept: 'application/json', 'user-agent': 'TerraTuta/1.0 (farm climate analysis)' },
+        signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+      });
+      const body = await upstream.text();
+      if (upstream.ok) {
+        JSON.parse(body); // never cache an HTML error page served with 200
+        await writeCache(file, body);
+      }
+      res.status(upstream.status).type('application/json').setHeader('x-cache', 'miss').send(body);
+    } catch (error) {
+      console.warn(`Upstream ${upstreamUrl.hostname} failed:`, error instanceof Error ? error.message : error);
+      res.status(502).json({ error: `Upstream ${upstreamUrl.hostname} unavailable.` });
+    }
+  });
+
   app.post('/api/agro-detective', async (req, res) => {
     try {
       const payload = req.body as AgroBriefingRequest;
@@ -232,7 +298,18 @@ async function startServer() {
         res.status(400).json({ error: 'Missing required climate statistics or soil profile.' });
         return;
       }
+      // Request timings differ on every visit and don't affect the briefing
+      const file = cachePath('briefing', JSON.stringify(payload, (k, v) => (k === 'latencyMs' ? undefined : v)));
+      const cached = await readCache(file);
+      if (cached !== null) {
+        res.type('application/json').setHeader('x-cache', 'hit').send(cached);
+        return;
+      }
       const briefing = await generateGeminiBriefing(payload);
+      // The deterministic fallback is not cached, so Gemini is tried again on the next visit
+      if (briefing.generatedBy !== 'deterministic-engine') {
+        await writeCache(file, JSON.stringify(briefing));
+      }
       res.json(briefing);
     } catch (error) {
       console.error('Agro-detective endpoint error:', error);
