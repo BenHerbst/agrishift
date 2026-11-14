@@ -54,3 +54,36 @@ def to_monthly(daily: pd.DataFrame) -> pd.DataFrame:
     days_present = daily["tmax"].resample("MS").count()
     complete = days_present == days_present.index.days_in_month
     return monthly[complete]
+
+
+SEASON_NAMES = ("Dec–Feb", "Mar–May", "Jun–Aug", "Sep–Nov")
+
+
+def period_means(monthly: pd.DataFrame, period: str) -> pd.DataFrame:
+    """Average monthly values per meteorological season or calendar year (period = month | season | year).
+
+    Values stay monthly means in the original units (e.g. precip = mean mm per month), so a season and
+    a single month are directly comparable. December belongs to the following year's Dec–Feb season,
+    as in the seasonal risk. Index: period label ("2027", "Dec–Feb 2027"); `start`, `end`, `months` tell
+    which months were present – the first/last period can be partial.
+    """
+    if period == "month":
+        out = monthly.copy()
+        out.index = out.index.strftime("%Y-%m")
+        out.insert(0, "start", out.index)
+        out.insert(1, "end", out.index)
+        out.insert(2, "months", 1)
+        return out
+    idx = pd.DatetimeIndex(monthly.index)
+    if period == "year":
+        labels = idx.year.astype(str)
+    else:
+        shifted = idx + pd.DateOffset(months=1)  # Dec → Jan of next year lines seasons up with quarters
+        labels = [f"{SEASON_NAMES[(m - 1) // 3]} {y}" for y, m in zip(shifted.year, shifted.month)]
+    grouped = monthly.groupby(pd.Index(labels, name="period"), sort=False)
+    out = grouped.mean(numeric_only=True)
+    month_str = pd.Series(idx.strftime("%Y-%m"), index=monthly.index).groupby(labels, sort=False)
+    out.insert(0, "start", month_str.first())
+    out.insert(1, "end", month_str.last())
+    out.insert(2, "months", grouped.size())
+    return out

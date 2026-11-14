@@ -76,6 +76,8 @@ export interface RegionalGrid {
 export interface GridFrame {
   values: Float64Array;
   kind: 'measured' | 'forecast' | 'normal';
+  /** Colour scale: mean of the monthly ranges of the period's calendar months. */
+  range: [number, number];
 }
 
 const gridCache = new Map<string, Promise<RegionalGrid>>();
@@ -182,28 +184,47 @@ export function nearestPointIndex(grid: RegionalGrid, lat: number, lon: number):
 }
 
 /**
- * Grid values for one month. Measured months come straight from NASA POWER; later months apply
- * the site's value for that month as an anomaly to every cell's 1991–2020 normal.
+ * Grid values averaged over the given months (one month, a season or a year). Measured months come
+ * straight from NASA POWER, later months fall back to each cell's 1991–2020 normal. If any month is
+ * not measured, the site's period value is applied as an anomaly to the whole averaged frame.
  */
 export function gridFrame(
   grid: RegionalGrid,
-  year: number,
-  month: number,
+  months: Array<{ year: number; month: number }>,
   site: { lat: number; lon: number; value?: number }
 ): GridFrame {
-  const measured = grid.months.get(`${year}${String(month).padStart(2, '0')}`);
-  if (measured && measured.some((v) => !Number.isNaN(v))) {
-    return { values: measured, kind: 'measured' };
+  const n = grid.points.length;
+  const sum = new Float64Array(n);
+  const count = new Float64Array(n);
+  let allMeasured = true;
+  for (const { year, month } of months) {
+    let src = grid.months.get(`${year}${String(month).padStart(2, '0')}`);
+    if (!src || src.every((v) => Number.isNaN(v))) {
+      src = grid.normals[month - 1];
+      allMeasured = false;
+    }
+    src.forEach((v, i) => {
+      if (Number.isNaN(v)) return;
+      sum[i] += v;
+      count[i] += 1;
+    });
   }
-  const normal = grid.normals[month - 1];
-  const siteNormal = normal[nearestPointIndex(grid, site.lat, site.lon)];
+  const values = sum.map((v, i) => (count[i] > 0 ? v / count[i] : NaN));
+  const ranges = months.map(({ month }) => grid.ranges[month - 1]);
+  const range: [number, number] = [
+    ranges.reduce((a, r) => a + r[0], 0) / ranges.length,
+    ranges.reduce((a, r) => a + r[1], 0) / ranges.length,
+  ];
+  if (allMeasured) return { values, kind: 'measured', range };
+
+  const siteNormal = values[nearestPointIndex(grid, site.lat, site.lon)];
   if (site.value === undefined || !Number.isFinite(site.value) || !Number.isFinite(siteNormal)) {
-    return { values: normal, kind: 'normal' };
+    return { values, kind: 'normal', range };
   }
   if (grid.layer.anomaly === 'ratio') {
     const ratio = siteNormal > 0.05 ? Math.min(3, Math.max(0.3, site.value / siteNormal)) : 1;
-    return { values: normal.map((v) => v * ratio), kind: 'forecast' };
+    return { values: values.map((v) => v * ratio), kind: 'forecast', range };
   }
   const delta = site.value - siteNormal;
-  return { values: normal.map((v) => v + delta), kind: 'forecast' };
+  return { values: values.map((v) => v + delta), kind: 'forecast', range };
 }

@@ -8,7 +8,7 @@ import threading
 import time
 from collections import OrderedDict
 from functools import lru_cache
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Literal, Optional, Tuple
 
 import pandas as pd
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
@@ -20,7 +20,7 @@ from .calibration import (
 )
 from .data import RateLimited, fetch_climate_indices
 from .ensemble import forecast_location
-from .features import MONTHLY_VARIABLES, to_monthly
+from .features import MONTHLY_VARIABLES, period_means, to_monthly
 from .members import MAX_HORIZON_MONTHS, PROPHET_AVAILABLE
 from .risk import BASE_YEARS, RECENT_YEARS, seasonal_risk
 from .seasonal import fetch_seasonal
@@ -55,6 +55,8 @@ LatQuery = Query(..., ge=-90, le=90, description="Latitude in decimal degrees")
 LonQuery = Query(..., ge=-180, le=180, description="Longitude in decimal degrees")
 RootDepthQuery = Query(DEFAULT_ROOT_DEPTH_CM, ge=20, le=100,
                        description="Rooting depth in cm (e.g. lettuce 30, potato 50, wheat/maize 100)")
+PeriodQuery = Query("month", description="Average per 'month', meteorological 'season' (Dec–Feb, Mar–May, …) "
+                                         "or calendar 'year'. Values stay monthly means in the variable's unit.")
 KcQuery = Query(1.0, ge=0.1, le=1.5, description="Crop coefficient: crop water use = Kc × ET0 (1.0 = reference grass; "
                                                   "maize/wheat mid-season ~1.15–1.2)")
 
@@ -224,17 +226,20 @@ def history(
     lon: float = LonQuery,
     start_year: int = Query(2000, ge=1980),
     variables: Optional[str] = Query(None, description="Comma-separated, e.g. 'precip,gdd'. Default: all"),
+    period: Literal["month", "season", "year"] = PeriodQuery,
 ):
-    """Observed monthly values (station-calibrated if a station was uploaded)."""
+    """Observed monthly values (station-calibrated if a station was uploaded), optionally averaged per period."""
     names = _parse_variables(variables)
     daily, _ = _upstream(_daily, *_key(lat, lon))
     df = to_monthly(daily)
-    df = df[df.index.year >= start_year][names].round(3)
-    return {
-        "latitude": lat,
-        "longitude": lon,
-        "months": [{"month": idx.strftime("%Y-%m"), **row.to_dict()} for idx, row in df.iterrows()],
-    }
+    df = df[df.index.year >= start_year][names]
+    out = {"latitude": lat, "longitude": lon, "period": period}
+    if period == "month":
+        out["months"] = [{"month": idx.strftime("%Y-%m"), **row.to_dict()} for idx, row in df.round(3).iterrows()]
+    else:
+        agg = period_means(df, period).round(3)
+        out["periods"] = [{"period": label, **row.to_dict()} for label, row in agg.iterrows()]
+    return out
 
 
 @app.get("/forecast")
@@ -244,8 +249,12 @@ def forecast(
     years: int = Query(3, ge=1, le=3, description="Forecast horizon in years"),
     variables: Optional[str] = Query(None, description="Comma-separated, e.g. 'tmean,precip'. Default: all"),
     refresh: bool = Query(False, description="Ignore the cached forecast and retrain (~25 s)"),
+    period: Literal["month", "season", "year"] = PeriodQuery,
 ):
     """Monthly ensemble forecast with 80 % range, per-model values and out-of-sample backtest skill.
+
+    With period=season|year the monthly rows are additionally averaged into `periods` (forecast, range and
+    per-model values); `forecast` keeps the monthly rows.
 
     The first request for a new location downloads data and trains all models (~1–2 min); after that the
     forecast comes from the cache until a new month of data arrives.
@@ -253,22 +262,43 @@ def forecast(
     names = _parse_variables(variables)
     result, cache_info = _upstream(_location, *_key(lat, lon), refresh)
     months = min(years * 12, MAX_HORIZON_MONTHS)
+    variables_out = {}
+    for name in names:
+        rows = result["variables"][name]["forecast"][:months]
+        variables_out[name] = {
+            "unit": MONTHLY_VARIABLES[name][1],
+            "backtest": result["variables"][name]["backtest"],
+            "forecast": rows,
+        }
+        if period != "month":
+            variables_out[name]["periods"] = _forecast_periods(rows, period)
     return {
         "latitude": lat,
         "longitude": lon,
         "trained_until": result["trained_until"],
         "horizon_months": months,
+        "period": period,
         "cache": cache_info,
         "sources": result["sources"],
-        "variables": {
-            name: {
-                "unit": MONTHLY_VARIABLES[name][1],
-                "backtest": result["variables"][name]["backtest"],
-                "forecast": result["variables"][name]["forecast"][:months],
-            }
-            for name in names
-        },
+        "variables": variables_out,
     }
+
+
+def _forecast_periods(rows: List[Dict], period: str) -> List[Dict]:
+    # shortcut: averaging the monthly 80 % bounds gives a slightly too wide range (errors partly cancel
+    # over a season), upgrade to aggregating the ensemble spread if period ranges get used for decisions
+    frame = pd.DataFrame(
+        [{"forecast": r["forecast"], "lower_80": r["lower_80"], "upper_80": r["upper_80"],
+          **{f"model:{m}": v for m, v in r["models"].items()}} for r in rows],
+        index=pd.DatetimeIndex([pd.Timestamp(r["month"]) for r in rows]),
+    )
+    agg = period_means(frame, period).round(2)
+    out = []
+    for label, row in agg.iterrows():
+        models = {k[6:]: v for k, v in row.items() if k.startswith("model:") and pd.notna(v)}
+        out.append({"period": label, **{k: v for k, v in row.items() if not k.startswith("model:")},
+                    "models": models})
+    return out
 
 
 @app.get("/agri-summary")

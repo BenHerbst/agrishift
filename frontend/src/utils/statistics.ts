@@ -16,6 +16,52 @@ import { aggregateEnsembleByWindow } from './ensembleForecast';
 /** First year shown in the chart and timeline. Trend statistics still use the full 1990–2025 record. */
 export const DISPLAY_START_YEAR = 2000;
 
+export interface YearMonth {
+  year: number;
+  month: number; // 1..12
+}
+
+/** Months the timeline currently averages over. Step 0 = Jan of DISPLAY_START_YEAR. */
+export interface TimelinePeriod {
+  size: 1 | 3 | 12;
+  start: YearMonth;
+  end: YearMonth;
+  months: YearMonth[];
+}
+
+const stepToYearMonth = (step: number): YearMonth => ({
+  year: DISPLAY_START_YEAR + Math.floor(step / 12),
+  month: (step % 12) + 1,
+});
+
+/**
+ * The period containing `step`: the month itself, its meteorological season (Dec–Feb, Mar–May,
+ * Jun–Aug, Sep–Nov, same as the backend's risk seasons) or its calendar year, clipped to [0, maxStep].
+ */
+export function timelinePeriod(step: number, size: 1 | 3 | 12, maxStep: number): TimelinePeriod {
+  const m0 = step % 12;
+  const offset = size === 12 ? m0 : size === 3 ? (m0 + 1) % 3 : 0;
+  const startStep = Math.max(0, step - offset);
+  const endStep = Math.min(maxStep, step - offset + size - 1);
+  const months: YearMonth[] = [];
+  for (let s = startStep; s <= endStep; s++) months.push(stepToYearMonth(s));
+  return { size, start: months[0], end: months[months.length - 1], months };
+}
+
+/** "Jul 2027", "Dez 2026 – Feb 2027", "Jun – Aug 2027", "2027" (or "2028 (Jan – Mär)" if cut off). */
+export function formatTimelinePeriod(period: TimelinePeriod, monthNames: string[]): string {
+  const { start, end, size, months } = period;
+  const mn = (m: number) => monthNames[m - 1];
+  if (size === 1) return `${mn(start.month)} ${start.year}`;
+  if (size === 12) {
+    return months.length === 12 ? `${start.year}` : `${start.year} (${mn(start.month)} – ${mn(end.month)})`;
+  }
+  if (months.length === 1) return `${mn(start.month)} ${start.year}`;
+  return start.year === end.year
+    ? `${mn(start.month)} – ${mn(end.month)} ${end.year}`
+    : `${mn(start.month)} ${start.year} – ${mn(end.month)} ${end.year}`;
+}
+
 export const VARIABLE_META: Record<ClimateVariable, VariableMetadata> = {
   T2M: {
     code: 'T2M',
@@ -966,7 +1012,7 @@ function projectMonthlyDelta(
 /**
  * Extends 1990–2025 monthly records through Dec 2035 when in projection mode,
  * slices all 4 variables strictly up to (activeYear, activeMonth), and computes
- * the exact monthly telemetry + 1990s seasonal baseline anomaly for that month.
+ * the telemetry + 1990s seasonal baseline anomaly averaged over `periodMonths` (default: that month).
  */
 export function extendAndSliceMonthlyRecords(
   recordsByVariable: Record<ClimateVariable, MonthlyRecord[]>,
@@ -974,7 +1020,8 @@ export function extendAndSliceMonthlyRecords(
   forecastMode: ForecastMode,
   activeYear: number,
   activeMonth: number,
-  ensembleRecords?: EnsembleRecordsByVariable | null
+  ensembleRecords?: EnsembleRecordsByVariable | null,
+  periodMonths: YearMonth[] = [{ year: activeYear, month: activeMonth }]
 ): MonthlyTimelineSnapshot {
   const variables: ClimateVariable[] = ['T2M', 'PRECTOTCORR', 'GWETROOT', 'EVLAND'];
   const slicedRecordsByVariable = {} as Record<ClimateVariable, MonthlyRecord[]>;
@@ -1049,11 +1096,18 @@ export function extendAndSliceMonthlyRecords(
     );
     slicedRecordsByVariable[variable] = sliced;
 
-    const exactRecord =
-      sliced.find((r) => r.year === activeYear && r.month === activeMonth) ??
-      sliced[sliced.length - 1];
-    const currentValue = exactRecord?.value ?? annualStats.recentMean;
-    const baseMonthMean = baselineMonthMeans.get(activeMonth) ?? annualStats.baselineMean;
+    const periodKeys = new Set(periodMonths.map((p) => p.year * 12 + p.month));
+    const periodRecords = sliced.filter((r) => periodKeys.has(r.year * 12 + r.month));
+    const mean = (xs: number[]) => xs.reduce((acc, x) => acc + x, 0) / xs.length;
+    const currentValue =
+      periodRecords.length > 0
+        ? mean(periodRecords.map((r) => r.value))
+        : sliced[sliced.length - 1]?.value ?? annualStats.recentMean;
+    // Baseline over the same calendar months the period actually has data for
+    const baseMonths = periodRecords.length > 0 ? periodRecords.map((r) => r.month) : [activeMonth];
+    const baseMonthMean = mean(
+      baseMonths.map((m) => baselineMonthMeans.get(m) ?? annualStats.baselineMean)
+    );
 
     activeMonthValues[variable] = {
       value: Number(currentValue.toFixed(decimals)),

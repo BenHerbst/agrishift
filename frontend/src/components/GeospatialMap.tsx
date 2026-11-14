@@ -8,6 +8,7 @@ import {
   Globe,
   Layers,
   Loader2,
+  LocateFixed,
   PenTool,
   Thermometer,
   Trash2,
@@ -24,6 +25,7 @@ import {
   GRID_LON_STEP,
   HEATMAP_LAYERS,
   MEASURED_END_YEAR,
+  regionalBox,
   fetchRegionalGrid,
   gridFrame,
   type GridFrame,
@@ -33,9 +35,9 @@ import {
 import type { DrawnFieldPolygon } from '../types/terrashift';
 
 interface MapTimelineTelemetry {
-  year: number;
-  month: number;
-  monthLabel: string;
+  /** Months of the active timeline period; values below are averages over them. */
+  months: Array<{ year: number; month: number }>;
+  periodLabel: string;
   tempC?: number;
   precip?: number;
   moisture?: number;
@@ -296,9 +298,10 @@ const HEAT_MIN_WEIGHT = 0.14;
 /** Kernel radius relative to the grid spacing: large enough to blend cells into a smooth field. */
 const HEAT_RADIUS_FACTOR = 1.3;
 const HEAT_MAX_ZOOM = 11.5;
-const HEAT_REGION_ZOOM = 7.2;
 const HEAT_OPACITY = 0.72;
-const SITE_ZOOM = 13.2;
+/** Close in, the 0.5° cells are drawn as a flat tint (the heatmap kernel would get huge). */
+const HEAT_CELL_MIN_ZOOM = HEAT_MAX_ZOOM - 0.6;
+const HEAT_CELL_OPACITY = 0.38;
 // Mapbox heatmap kernel: weight · intensity · GAUSS_COEF · exp(-4.5 · (d / radius)²)
 const GAUSS_COEF = 0.3989422804014327;
 
@@ -338,17 +341,50 @@ function heatKernel(lat: number) {
   };
 }
 
-function buildHeatGeoJson(grid: RegionalGrid, frame: GridFrame, month: number): GeoJsonData {
-  const [lo, hi] = grid.ranges[month - 1];
-  const features = grid.points.flatMap(([lon, lat], i) => {
+/** Weight → colour for the close-up cell layer, same ramp as the heatmap. */
+function cellColorExpression(colors: string[]): mapboxgl.ExpressionSpecification {
+  const stops: Array<number | string> = [];
+  colors.forEach((c, i) => {
+    stops.push(HEAT_MIN_WEIGHT + ((1 - HEAT_MIN_WEIGHT) * i) / (colors.length - 1), c);
+  });
+  return ['interpolate', ['linear'], ['get', 'w'], ...stops] as mapboxgl.ExpressionSpecification;
+}
+
+function heatWeights(grid: RegionalGrid, frame: GridFrame): Array<{ i: number; w: number }> {
+  const [lo, hi] = frame.range;
+  return grid.points.flatMap((_, i) => {
     const v = frame.values[i];
     if (!Number.isFinite(v)) return [];
     const f = Math.max(0, Math.min(1, (v - lo) / (hi - lo)));
-    return [{
+    return [{ i, w: HEAT_MIN_WEIGHT + (1 - HEAT_MIN_WEIGHT) * f }];
+  });
+}
+
+function buildHeatGeoJson(grid: RegionalGrid, frame: GridFrame): GeoJsonData {
+  const features = heatWeights(grid, frame).map(({ i, w }) => ({
+    type: 'Feature' as const,
+    properties: { w },
+    geometry: { type: 'Point' as const, coordinates: grid.points[i] },
+  }));
+  return { type: 'FeatureCollection', features };
+}
+
+function buildHeatCellGeoJson(grid: RegionalGrid, frame: GridFrame): GeoJsonData {
+  const dLon = GRID_LON_STEP / 2;
+  const dLat = GRID_LAT_STEP / 2;
+  const features = heatWeights(grid, frame).map(({ i, w }) => {
+    const [lon, lat] = grid.points[i];
+    return {
       type: 'Feature' as const,
-      properties: { w: HEAT_MIN_WEIGHT + (1 - HEAT_MIN_WEIGHT) * f },
-      geometry: { type: 'Point' as const, coordinates: [lon, lat] },
-    }];
+      properties: { w },
+      geometry: {
+        type: 'Polygon' as const,
+        coordinates: [[
+          [lon - dLon, lat - dLat], [lon + dLon, lat - dLat], [lon + dLon, lat + dLat],
+          [lon - dLon, lat + dLat], [lon - dLon, lat - dLat],
+        ]],
+      },
+    };
   });
   return { type: 'FeatureCollection', features };
 }
@@ -402,12 +438,13 @@ export function GeospatialMap({
   heatGridRef.current = heatGrid;
   const heatFrameRef = useRef(heatFrame);
   heatFrameRef.current = heatFrame;
-  const heatZoomedOutRef = useRef(false);
   const heatRef = useRef({
     front: 0,
     data: [EMPTY_GEOJSON, EMPTY_GEOJSON] as GeoJsonData[],
     color: [heatColorExpression(HEATMAP_LAYERS.temp.colors), heatColorExpression(HEATMAP_LAYERS.temp.colors)],
     visible: false,
+    cells: EMPTY_GEOJSON,
+    cellColor: cellColorExpression(HEATMAP_LAYERS.temp.colors),
     pending: null as { layer: number; duration: number } | null,
     lastChange: 0,
     fadeTimer: 0 as ReturnType<typeof setTimeout> | 0,
@@ -416,7 +453,6 @@ export function GeospatialMap({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const prevBasemapRef = useRef<BasemapMode>(basemap);
-  const lastFlyCoordsRef = useRef<{ lat: number; lon: number }>({ lat, lon });
 
   const onSelectRef = useRef(onSelectCoordinates);
   const onConfirmFieldRef = useRef(onConfirmDrawnField);
@@ -741,6 +777,28 @@ export function GeospatialMap({
         map.setPaintProperty(HEAT_LAYER_IDS[i], 'heatmap-radius', kernel.radius);
       }
     });
+    if (!map.getSource('heat-cells-source')) {
+      map.addSource('heat-cells-source', { type: 'geojson', data: h.cells });
+    }
+    if (!map.getLayer('heat-cells')) {
+      map.addLayer(
+        {
+          id: 'heat-cells',
+          type: 'fill',
+          source: 'heat-cells-source',
+          minzoom: HEAT_CELL_MIN_ZOOM,
+          layout: { visibility: h.visible ? 'visible' : 'none' },
+          paint: {
+            'fill-color': h.cellColor,
+            'fill-antialias': false,
+            'fill-opacity': [
+              'interpolate', ['linear'], ['zoom'], HEAT_CELL_MIN_ZOOM, 0, HEAT_MAX_ZOOM, HEAT_CELL_OPACITY,
+            ],
+          },
+        },
+        beforeId && map.getLayer(beforeId) ? beforeId : undefined
+      );
+    }
   };
 
   const runHeatFade = (map: mapboxgl.Map) => {
@@ -768,6 +826,11 @@ export function GeospatialMap({
     h.data[back] = data;
     h.color[back] = color;
     h.visible = true;
+    (map.getSource('heat-cells-source') as mapboxgl.GeoJSONSource | undefined)?.setData(h.cells);
+    if (map.getLayer('heat-cells')) {
+      map.setPaintProperty('heat-cells', 'fill-color', h.cellColor);
+      map.setLayoutProperty('heat-cells', 'visibility', 'visible');
+    }
     const source = map.getSource(HEAT_SOURCE_IDS[back]) as mapboxgl.GeoJSONSource | undefined;
     if (!source) return;
     source.setData(data);
@@ -782,6 +845,7 @@ export function GeospatialMap({
     h.visible = false;
     h.pending = null;
     clearTimeout(h.fadeTimer);
+    if (map.getLayer('heat-cells')) map.setLayoutProperty('heat-cells', 'visibility', 'none');
     HEAT_LAYER_IDS.forEach((layerId) => {
       if (!map.getLayer(layerId)) return;
       map.setPaintProperty(layerId, 'heatmap-opacity-transition', { duration: 450, delay: 0 });
@@ -946,25 +1010,11 @@ export function GeospatialMap({
     const map = mapRef.current;
     if (!map || styleRevision === 0) return;
 
+    // No camera moves here: sites are picked on the map itself, so the view stays where the user put it
     syncMapboxLayers(map);
-
-    const coordsChanged =
-      Math.abs(lastFlyCoordsRef.current.lat - lat) > 0.0002 ||
-      Math.abs(lastFlyCoordsRef.current.lon - lon) > 0.0002;
-
-    if (coordsChanged) {
-      lastFlyCoordsRef.current = { lat, lon };
-      map.flyTo({
-        center: [lon, lat],
-        // Keep the regional view while a climate layer is shown
-        zoom: heatLayerRef.current ? map.getZoom() : Math.max(map.getZoom(), SITE_ZOOM),
-        duration: 500,
-        essential: true,
-      });
-    }
   }, [lat, lon, regionName, drawnField, styleRevision]);
 
-  // Climate layer on/off: fly out to the regional view and back to the site
+  // Climate layer on/off. The camera stays put; the cell tint covers close zoom levels.
   const prevHeatActiveRef = useRef(false);
   useEffect(() => {
     const map = mapRef.current;
@@ -973,21 +1023,13 @@ export function GeospatialMap({
     prevHeatActiveRef.current = active;
     if (active) {
       if (isDrawingRef.current && draftVerticesRef.current.length === 0) {
-        setIsDrawingField(false); // clicks select sites in the regional view
-      }
-      if (map.getZoom() > HEAT_REGION_ZOOM + 1.5) {
-        heatZoomedOutRef.current = true;
-        map.flyTo({ center: [lon, lat], zoom: HEAT_REGION_ZOOM, duration: 2200, curve: 1.3, essential: true });
+        setIsDrawingField(false); // clicks select sites while a climate layer is shown
       }
     } else {
       hideHeat(map);
       setHeatCursorValue(null);
-      if (heatZoomedOutRef.current) {
-        heatZoomedOutRef.current = false;
-        map.flyTo({ center: [lon, lat], zoom: SITE_ZOOM, duration: 1800, curve: 1.3, essential: true });
-      }
     }
-  }, [heatLayer, lat, lon]);
+  }, [heatLayer]);
 
   // Regional grid for the selected layer (cached per layer and 1° box)
   useEffect(() => {
@@ -1014,9 +1056,9 @@ export function GeospatialMap({
     };
   }, [heatLayer, lat, lon]);
 
-  // Frame for the timeline's month
-  const heatYear = activeTimeline?.year ?? MEASURED_END_YEAR;
-  const heatMonth = activeTimeline?.month ?? 7;
+  // Frame for the timeline's period (month, season or year)
+  const heatMonths = activeTimeline?.months ?? [{ year: MEASURED_END_YEAR, month: 7 }];
+  const heatPeriodKey = heatMonths.map((m) => m.year * 12 + m.month).join(',');
   const heatSiteValue =
     heatLayer === 'temp'
       ? activeTimeline?.tempC
@@ -1031,14 +1073,17 @@ export function GeospatialMap({
       setHeatFrame(null);
       return;
     }
-    setHeatFrame(gridFrame(heatGrid, heatYear, heatMonth, { lat, lon, value: heatSiteValue }));
-  }, [heatGrid, heatLayer, heatYear, heatMonth, heatSiteValue, lat, lon]);
+    setHeatFrame(gridFrame(heatGrid, heatMonths, { lat, lon, value: heatSiteValue }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- heatPeriodKey stands for heatMonths
+  }, [heatGrid, heatLayer, heatPeriodKey, heatSiteValue, lat, lon]);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map || styleRevision === 0 || !heatGrid || !heatFrame || !heatLayer) return;
     ensureHeatLayers(map);
-    pushHeatFrame(map, buildHeatGeoJson(heatGrid, heatFrame, heatMonth), heatColorExpression(heatGrid.layer.colors));
+    heatRef.current.cells = buildHeatCellGeoJson(heatGrid, heatFrame);
+    heatRef.current.cellColor = cellColorExpression(heatGrid.layer.colors);
+    pushHeatFrame(map, buildHeatGeoJson(heatGrid, heatFrame), heatColorExpression(heatGrid.layer.colors));
   }, [heatFrame, styleRevision]);
 
   useEffect(() => {
@@ -1201,6 +1246,18 @@ export function GeospatialMap({
           </div>
         )}
 
+        {!mapError && (
+          <button
+            type="button"
+            onClick={() => mapRef.current?.easeTo({ center: [lon, lat], duration: 700, essential: true })}
+            title={t.map.recenter}
+            aria-label={t.map.recenter}
+            className="absolute left-[10px] top-[78px] z-10 flex h-[29px] w-[29px] items-center justify-center rounded-[4px] bg-white text-[#333] shadow-[0_0_0_2px_rgba(0,0,0,0.1)] hover:bg-[#f2f2f2] cursor-pointer"
+          >
+            <LocateFixed className="h-4 w-4" aria-hidden="true" />
+          </button>
+        )}
+
         {/* Top-Right Climate Layer Toggles + Legend */}
         <div className="pointer-events-none absolute top-3 right-3 z-10 flex w-[min(17.5rem,calc(100%-4.5rem))] flex-col items-end gap-2">
           <div className="pointer-events-auto w-full border border-[#262B33] bg-[#111316]/85 backdrop-blur-md p-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.35)]">
@@ -1245,7 +1302,7 @@ export function GeospatialMap({
 
           {heatLayer && (() => {
             const spec = HEATMAP_LAYERS[heatLayer];
-            const range = heatGrid?.layer.id === heatLayer ? heatGrid.ranges[heatMonth - 1] : null;
+            const range = heatGrid?.layer.id === heatLayer && heatFrame ? heatFrame.range : null;
             const fmt = (v: number) => `${v.toFixed(spec.decimals)}${spec.unit === 'GWET' ? '' : ` ${spec.unit}`}`;
             const pos = (v: number | null | undefined) =>
               range && v !== null && v !== undefined && Number.isFinite(v)
@@ -1261,8 +1318,8 @@ export function GeospatialMap({
                   <span className="text-xs font-semibold text-[#ECEEF0]">
                     {heatLayer === 'temp' ? t.map.heatTemp : heatLayer === 'precip' ? t.map.heatPrecip : t.map.heatMoisture}
                   </span>
-                  <span key={`${heatYear}-${heatMonth}`} className="font-mono text-[11px] tabular-nums text-emerald-300 heat-month-tick">
-                    {activeTimeline ? `${activeTimeline.monthLabel} ${activeTimeline.year}` : ''}
+                  <span key={heatPeriodKey} className="font-mono text-[11px] tabular-nums text-emerald-300 heat-month-tick whitespace-nowrap">
+                    {activeTimeline ? `${heatMonths.length > 1 ? 'Ø ' : ''}${activeTimeline.periodLabel}` : ''}
                   </span>
                 </div>
 
@@ -1324,7 +1381,10 @@ export function GeospatialMap({
           {heatLayer && heatTooClose && (
             <button
               type="button"
-              onClick={() => mapRef.current?.flyTo({ center: [lon, lat], zoom: HEAT_REGION_ZOOM, duration: 1600, essential: true })}
+              onClick={() => {
+                const box = regionalBox(lat, lon);
+                mapRef.current?.fitBounds([[box.lonMin, box.latMin], [box.lonMax, box.latMax]], { duration: 1200, essential: true });
+              }}
               className="pointer-events-auto border border-[#262B33] bg-[#111316]/85 backdrop-blur-md px-2.5 py-1 text-[10px] text-[#A1A8B3] hover:text-[#ECEEF0] transition-colors cursor-pointer"
             >
               {t.map.heatZoomHint}
@@ -1376,7 +1436,8 @@ export function GeospatialMap({
           {activeTimeline && activeTimeline.tempC !== undefined && (
             <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 border-t border-[#262B33] pt-1 font-mono text-[10px] tabular-nums text-[#A1A8B3]">
               <span className="text-emerald-300 font-semibold">
-                {activeTimeline.monthLabel} {activeTimeline.year}
+                {activeTimeline.months.length > 1 ? 'Ø ' : ''}
+                {activeTimeline.periodLabel}
               </span>
               <span>{activeTimeline.tempC.toFixed(1)} °C</span>
               {activeTimeline.precip !== undefined && (

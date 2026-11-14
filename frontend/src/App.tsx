@@ -26,6 +26,8 @@ import {
   buildForecastSeries,
   evaluateAgronomicThreshold,
   extendAndSliceMonthlyRecords,
+  formatTimelinePeriod,
+  timelinePeriod,
   DISPLAY_START_YEAR,
 } from './utils/statistics';
 import { buildEnsembleMonthlyRecords, ensembleHorizon } from './utils/ensembleForecast';
@@ -324,8 +326,20 @@ export default function App() {
   }, []);
 
   const clampedTimelineStep = Math.min(Math.max(timelineStep, 0), maxTimelineStep);
-  const activeTimelineYear = BASE_TIMELINE_YEAR + Math.floor(clampedTimelineStep / 12);
-  const activeTimelineMonth = (clampedTimelineStep % 12) + 1;
+  // Month, season or year around the slider position; everything downstream averages over it
+  const activePeriod = useMemo(
+    () => timelinePeriod(clampedTimelineStep, timelineStepIncrement, maxTimelineStep),
+    [clampedTimelineStep, timelineStepIncrement, maxTimelineStep]
+  );
+  const activeTimelineYear = activePeriod.end.year;
+  const activeTimelineMonth = activePeriod.end.month;
+  const monthShort = MONTH_SHORT_BY_LANG[lang];
+  const periodLabel = formatTimelinePeriod(activePeriod, monthShort);
+  // "bis …" labels: no month once the timeline steps by whole years
+  const periodEndLabel =
+    timelineStepIncrement === 12
+      ? `${activeTimelineYear}`
+      : `${monthShort[activeTimelineMonth - 1]} ${activeTimelineYear}`;
 
   const timelineSnapshot = useMemo(() => {
     if (!dataset) return null;
@@ -335,9 +349,10 @@ export default function App() {
       effectiveForecastMode,
       activeTimelineYear,
       activeTimelineMonth,
-      ensembleRecords
+      ensembleRecords,
+      activePeriod.months
     );
-  }, [dataset, effectiveForecastMode, activeTimelineYear, activeTimelineMonth, ensembleRecords]);
+  }, [dataset, effectiveForecastMode, activeTimelineYear, activeTimelineMonth, ensembleRecords, activePeriod]);
 
   const timeSlicedDataset = useMemo<EarthSystemDataset | null>(() => {
     if (!dataset || !timelineSnapshot) return dataset;
@@ -616,6 +631,16 @@ export default function App() {
     setTimelineStep(nextStep);
   }, []);
 
+  const handleChangeStepIncrement = useCallback(
+    (inc: TimelineStepIncrement) => {
+      setTimelineStepIncrement(inc);
+      // Park the slider at the end of the new period so playback steps whole periods
+      const end = timelinePeriod(clampedTimelineStep, inc, maxTimelineStep).end;
+      setTimelineStep((end.year - BASE_TIMELINE_YEAR) * 12 + end.month - 1);
+    },
+    [clampedTimelineStep, maxTimelineStep]
+  );
+
   const handleResetTimeline = useCallback(() => {
     setIsTimelinePlaying(false);
     setTimelineStep(maxTimelineStep);
@@ -630,16 +655,14 @@ export default function App() {
 
   const mapTimelineTelemetry = useMemo(() => {
     if (!timelineSnapshot) return null;
-    const monthNames = MONTH_SHORT_BY_LANG[lang];
     return {
-      year: activeTimelineYear,
-      month: activeTimelineMonth,
-      monthLabel: monthNames[Math.max(0, Math.min(11, activeTimelineMonth - 1))],
+      months: activePeriod.months,
+      periodLabel,
       tempC: timelineSnapshot.activeMonthValues.T2M?.value,
       precip: timelineSnapshot.activeMonthValues.PRECTOTCORR?.value,
       moisture: timelineSnapshot.activeMonthValues.GWETROOT?.value,
     };
-  }, [timelineSnapshot, lang, activeTimelineYear, activeTimelineMonth]);
+  }, [timelineSnapshot, activePeriod, periodLabel]);
 
   return (
     <>
@@ -671,7 +694,7 @@ export default function App() {
               stepIndex={clampedTimelineStep}
               maxStep={maxTimelineStep}
               activeYear={activeTimelineYear}
-              activeMonth={activeTimelineMonth}
+              periodLabel={periodLabel}
               isPlaying={isTimelinePlaying}
               stepIncrement={timelineStepIncrement}
               forecastMode={effectiveForecastMode}
@@ -682,7 +705,7 @@ export default function App() {
               onChangeStep={handleChangeTimelineStep}
               onTogglePlay={handleToggleTimelinePlay}
               onResetToFull={handleResetTimeline}
-              onChangeStepIncrement={setTimelineStepIncrement}
+              onChangeStepIncrement={handleChangeStepIncrement}
               onSelectVariable={setSelectedVariable}
             />
 
@@ -716,7 +739,8 @@ export default function App() {
                   forecastError={forecastError}
                   onRetryForecast={retryForecast}
                   activeYear={activeTimelineYear}
-                  activeMonth={activeTimelineMonth}
+                  activeMonths={activePeriod.months.map((p) => p.month)}
+                  periodEndLabel={periodEndLabel}
                   series={fullForecastSeries}
                   stats={activeStats}
                   thresholdFinding={thresholdFinding}

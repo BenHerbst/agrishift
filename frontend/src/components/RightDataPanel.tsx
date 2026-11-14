@@ -74,7 +74,10 @@ interface RightDataPanelProps {
   forecastError: string | null;
   onRetryForecast: () => void;
   activeYear: number;
-  activeMonth: number;
+  /** Calendar months of the active timeline period (1, 3 or 12). */
+  activeMonths: number[];
+  /** End of the active period, e.g. "Aug 2027" or just "2027" in year mode. */
+  periodEndLabel: string;
   series: AnnualPoint[];
   stats: TrendStatistics | null;
   thresholdFinding: ThresholdFinding | null;
@@ -109,7 +112,8 @@ export function RightDataPanel({
   forecastError,
   onRetryForecast,
   activeYear,
-  activeMonth,
+  activeMonths,
+  periodEndLabel,
   series,
   stats,
   thresholdFinding,
@@ -259,7 +263,7 @@ export function RightDataPanel({
             seasonalWindow={seasonalWindow}
             forecastMode={forecastMode}
             activeYear={activeYear}
-            activeMonth={activeMonth}
+            periodEndLabel={periodEndLabel}
             series={series}
             stats={stats}
             thresholdFinding={thresholdFinding}
@@ -293,8 +297,8 @@ export function RightDataPanel({
           <FieldShiftTabView
             dataset={dataset}
             monthNames={monthNames}
-            activeYear={activeYear}
-            activeMonth={activeMonth}
+            activeMonths={activeMonths}
+            periodEndLabel={periodEndLabel}
             lang={lang}
             t={t}
             baselineCrop={baselineCrop}
@@ -483,7 +487,7 @@ function TrendsTabView({
   seasonalWindow,
   forecastMode,
   activeYear,
-  activeMonth,
+  periodEndLabel,
   series: fullSeries,
   stats,
   thresholdFinding,
@@ -509,7 +513,7 @@ function TrendsTabView({
   seasonalWindow: SeasonalWindow;
   forecastMode: ForecastMode;
   activeYear: number;
-  activeMonth: number;
+  periodEndLabel: string;
   series: AnnualPoint[];
   stats: TrendStatistics;
   thresholdFinding: ThresholdFinding | null;
@@ -546,8 +550,6 @@ function TrendsTabView({
     localizeRegionName(dataset.regionName, dataset.lat, dataset.lon, lang),
     lang
   );
-  const monthNames = MONTH_SHORT_BY_LANG[lang];
-  const activeMonthName = monthNames[Math.max(0, Math.min(11, activeMonth - 1))];
 
   const badgeStyles = !stats.isSignificant
     ? 'border-[#262B33] bg-[#111316] text-[#A1A8B3]'
@@ -673,7 +675,7 @@ function TrendsTabView({
             </span>
           </div>
           <span className="font-mono text-xs tabular-nums text-[#A1A8B3]">
-            {stats.startYear}–{activeMonthName} {activeYear} · n = {stats.sampleCount} {t.trends.yearsSuffix} · {windowText[seasonalWindow].shortLabel}
+            {stats.startYear}–{periodEndLabel} · n = {stats.sampleCount} {t.trends.yearsSuffix} · {windowText[seasonalWindow].shortLabel}
           </span>
         </div>
 
@@ -1074,8 +1076,8 @@ function CustomSeriesTooltip({
 function FieldShiftTabView({
   dataset,
   monthNames,
-  activeYear,
-  activeMonth,
+  activeMonths,
+  periodEndLabel,
   lang,
   t,
   baselineCrop,
@@ -1090,8 +1092,8 @@ function FieldShiftTabView({
 }: {
   dataset: EarthSystemDataset;
   monthNames: string[];
-  activeYear: number;
-  activeMonth: number;
+  activeMonths: number[];
+  periodEndLabel: string;
   lang: 'de' | 'en';
   t: ReturnType<typeof useI18n>['t'];
   baselineCrop: BaselineCropId;
@@ -1110,7 +1112,6 @@ function FieldShiftTabView({
     { key: 'erosion', label: t.fieldShift.priorities.erosion },
     { key: 'profit', label: t.fieldShift.priorities.profit },
   ];
-  const activeMonthLabel = monthNames[Math.max(0, Math.min(11, activeMonth - 1))];
 
   return (
     <div role="tabpanel" className="space-y-5">
@@ -1119,7 +1120,7 @@ function FieldShiftTabView({
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#262B33] pb-3">
           <div>
             <p className="text-xs text-[#A1A8B3]">
-              {t.soil.kicker} · <span className="font-mono text-[#ECEEF0]">1990–{activeMonthLabel} {activeYear}</span>
+              {t.soil.kicker} · <span className="font-mono text-[#ECEEF0]">1990–{periodEndLabel}</span>
             </p>
             <h2 className="mt-0.5 text-sm font-semibold text-[#ECEEF0]">
               {localizeRegionName(dataset.regionName, dataset.lat, dataset.lon, lang)}
@@ -1363,7 +1364,7 @@ function FieldShiftTabView({
                         const isSelected =
                           selectedMonthCell?.yearLabel === yr.yearLabel &&
                           selectedMonthCell?.cell.month === cell.month;
-                        const isActiveTimelineMonth = cell.month === activeMonth;
+                        const isActiveTimelineMonth = activeMonths.includes(cell.month);
                         const bgClass =
                           cell.coverStatus === 'cover'
                             ? 'bg-emerald-500/20 border-emerald-500/45 text-emerald-200'

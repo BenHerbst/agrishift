@@ -9,8 +9,10 @@ export type TimelineStepIncrement = 1 | 3 | 12;
 interface GlobalTimelineBarProps {
   stepIndex: number;
   maxStep: number;
+  /** End year of the active period. */
   activeYear: number;
-  activeMonth: number; // 1..12
+  /** "Jul 2027", "Jun – Aug 2027" or "2027". */
+  periodLabel: string;
   isPlaying: boolean;
   stepIncrement: TimelineStepIncrement;
   forecastMode: ForecastMode;
@@ -32,7 +34,7 @@ export function GlobalTimelineBar({
   stepIndex,
   maxStep,
   activeYear,
-  activeMonth,
+  periodLabel,
   isPlaying,
   stepIncrement,
   forecastMode,
@@ -48,7 +50,6 @@ export function GlobalTimelineBar({
 }: GlobalTimelineBarProps) {
   const { lang, t } = useI18n();
   const monthNames = MONTH_SHORT_BY_LANG[lang];
-  const activeMonthLabel = monthNames[Math.max(0, Math.min(11, activeMonth - 1))];
   const isProjectedPeriod = activeYear > 2025;
   // The slider's last step defines the end year: 2025 (measured), ~2028 (ensemble) or 2035 (trend)
   const maxYear = DISPLAY_START_YEAR + Math.floor(Math.max(0, maxStep) / 12);
@@ -136,8 +137,9 @@ export function GlobalTimelineBar({
 
           <div className="flex items-center gap-2 pl-1">
             <Calendar className="h-3.5 w-3.5 text-[#7C8490]" aria-hidden="true" />
-            <span className="font-mono text-sm font-semibold tabular-nums text-[#ECEEF0] min-w-[78px]">
-              {activeMonthLabel} {activeYear}
+            <span className="font-mono text-sm font-semibold tabular-nums text-[#ECEEF0] min-w-[78px] whitespace-nowrap">
+              {stepIncrement > 1 && <span className="mr-1 text-[#7C8490]">Ø</span>}
+              {periodLabel}
             </span>
             <span
               className={`rounded-[2px] border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide ${
