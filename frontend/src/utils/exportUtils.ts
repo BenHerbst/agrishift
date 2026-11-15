@@ -175,27 +175,47 @@ export function exportSitePdfReport(params: {
     briefing,
   } = params;
 
+  const de = lang === 'de';
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const marginX = 16;
   const maxWidth = pageWidth - marginX * 2;
-  let y = 18;
+  const GREEN: [number, number, number] = [16, 150, 105];
+  const DARK: [number, number, number] = [20, 24, 30];
+  const MUTED: [number, number, number] = [90, 100, 112];
+  const LINE: [number, number, number] = [225, 229, 235];
+  const TOP = 20;
+  let y = TOP;
 
   const ensureSpace = (neededMm: number) => {
-    if (y + neededMm > pageHeight - 16) {
+    if (y + neededMm > pageHeight - 18) {
       doc.addPage();
-      y = 18;
+      y = TOP;
     }
   };
 
-  const writeWrapped = (text: string, fontSize = 10, lineHeight = 5, bold = false) => {
+  // The built-in helvetica has no arrows: they would print as garbage
+  const clean = (t: string) => t.replace(/[→⇒]/g, '>').trim();
+
+  const writeWrapped = (text: string, fontSize = 10, lineHeight = 5, bold = false, x = marginX) => {
     doc.setFont('helvetica', bold ? 'bold' : 'normal');
     doc.setFontSize(fontSize);
-    const lines = doc.splitTextToSize(text, maxWidth) as string[];
+    const lines = doc.splitTextToSize(clean(text), pageWidth - marginX - x) as string[];
     ensureSpace(lines.length * lineHeight + 2);
-    doc.text(lines, marginX, y);
+    doc.setLineHeightFactor(lineHeight / (fontSize * 0.3528)); // drawn spacing must match the y advance
+    doc.text(lines, x, y);
     y += lines.length * lineHeight;
+  };
+
+  const section = (title: string) => {
+    ensureSpace(16);
+    y += 3;
+    doc.setFillColor(...GREEN);
+    doc.rect(marginX, y - 4.6, 1.6, 6.4, 'F');
+    doc.setTextColor(...DARK);
+    writeWrapped(title, 12.5, 6, true, marginX + 4);
+    y += 2;
   };
 
   const regionLabel = localizeRegionName(dataset.regionName, dataset.lat, dataset.lon, lang);
@@ -203,152 +223,211 @@ export function exportSitePdfReport(params: {
   const windowLabel = SEASONAL_TEXT[lang][seasonalWindow].label;
   const slug = regionLabel.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
 
-  // Title Header
-  doc.setTextColor(20, 24, 30);
-  writeWrapped(
-    lang === 'de'
-      ? `AgriShift — Standort- & Klimabericht`
-      : `AgriShift — Site & Climate Report`,
-    16,
-    7,
-    true
+  // Header band
+  doc.setFillColor(...GREEN);
+  doc.rect(0, 0, pageWidth, 38, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(20);
+  doc.text('AgriShift', marginX, 17);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(11);
+  doc.text(de ? 'Standort- & Klimabericht' : 'Site & Climate Report', marginX, 25);
+  doc.setFontSize(9);
+  doc.text(
+    new Date().toLocaleDateString(de ? 'de-DE' : 'en-US'),
+    pageWidth - marginX,
+    17,
+    { align: 'right' }
   );
-  y += 1;
+  y = 50;
 
-  doc.setTextColor(80, 90, 102);
+  doc.setTextColor(...DARK);
+  writeWrapped(regionLabel, 15, 7, true);
+  doc.setTextColor(...MUTED);
   writeWrapped(
-    `${regionLabel}  |  ${dataset.lat.toFixed(4)}°, ${dataset.lon.toFixed(4)}° (WGS84)  |  ${windowLabel}`,
+    `${dataset.lat.toFixed(4)}°, ${dataset.lon.toFixed(4)}° (WGS84)  ·  ${windowLabel}  ·  ${
+      de ? 'Ausblick' : 'Forecast'
+    }: ${forecastMode}`,
     9.5,
-    4.8,
-    false
+    5
   );
   if (dataset.fieldAreaStats) {
     writeWrapped(
-      lang === 'de'
-        ? `Feld-Durchschnitt: ${dataset.fieldAreaStats.areaHectares.toFixed(2)} ha (${dataset.fieldAreaStats.samplePointsCount} Messpunkte, Umfang ${dataset.fieldAreaStats.perimeterMeters} m)`
-        : `Field Average: ${dataset.fieldAreaStats.areaHectares.toFixed(2)} ha (${dataset.fieldAreaStats.samplePointsCount} sample points, perimeter ${dataset.fieldAreaStats.perimeterMeters} m)`,
-      9.2,
-      4.6,
-      false
+      de
+        ? `Feld: ${dataset.fieldAreaStats.areaHectares.toFixed(2)} ha · ${dataset.fieldAreaStats.samplePointsCount} Messpunkte · Umfang ${dataset.fieldAreaStats.perimeterMeters} m`
+        : `Field: ${dataset.fieldAreaStats.areaHectares.toFixed(2)} ha · ${dataset.fieldAreaStats.samplePointsCount} sample points · perimeter ${dataset.fieldAreaStats.perimeterMeters} m`,
+      9.5,
+      5
     );
   }
-  writeWrapped(
-    `${lang === 'de' ? 'Erstellt am' : 'Generated'}: ${new Date().toLocaleDateString(
-      lang === 'de' ? 'de-DE' : 'en-US'
-    )}  |  ${lang === 'de' ? 'Ausblick' : 'Forecast'}: ${forecastMode}`,
-    9,
-    4.5,
-    false
-  );
+  y += 2;
 
-  y += 3;
-  doc.setDrawColor(210, 215, 222);
-  doc.line(marginX, y, pageWidth - marginX, y);
-  y += 6;
+  // 1. Soil: four stat boxes
+  section(de ? 'Bodenprofil (ISRIC SoilGrids, 0–30 cm)' : 'Topsoil Profile (ISRIC SoilGrids, 0–30 cm)');
+  const soilBoxes: Array<[string, string]> = [
+    [de ? 'Bodenart' : 'Texture', textureLabel],
+    [
+      `${de ? 'Ton' : 'Clay'} / ${de ? 'Schluff' : 'Silt'} / Sand`,
+      `${dataset.soil.clayPercent} / ${dataset.soil.siltPercent} / ${dataset.soil.sandPercent} %`,
+    ],
+    ['pH', dataset.soil.ph.toFixed(1)],
+    [de ? 'Org. Kohlenstoff' : 'Org. Carbon', `${dataset.soil.socPercent.toFixed(2)} %`],
+  ];
+  const gap = 3;
+  const boxW = (maxWidth - gap * 3) / 4;
+  ensureSpace(20);
+  soilBoxes.forEach(([label, value], i) => {
+    const x = marginX + i * (boxW + gap);
+    doc.setFillColor(244, 247, 249);
+    doc.setDrawColor(...LINE);
+    doc.roundedRect(x, y, boxW, 15, 1.5, 1.5, 'FD');
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...MUTED);
+    doc.text(doc.splitTextToSize(label, boxW - 4) as string[], x + 2.5, y + 5);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(...DARK);
+    doc.text(doc.splitTextToSize(value, boxW - 4) as string[], x + 2.5, y + 11.5);
+  });
+  y += 22;
 
-  // Section 1: Soil Profile
-  doc.setTextColor(20, 24, 30);
-  writeWrapped(
-    lang === 'de' ? '1. Bodenprofil (ISRIC SoilGrids 0–30 cm)' : '1. Topsoil Profile (ISRIC SoilGrids 0–30 cm)',
-    12,
-    6,
-    true
+  // 2. Climate trends: table
+  section(
+    de ? 'Klimaverlauf & Trendtest (1990–2025)' : 'Climate Trends & Mann-Kendall Test (1990–2025)'
   );
-  y += 1;
-  doc.setTextColor(50, 58, 68);
-  writeWrapped(
-    `${lang === 'de' ? 'Bodenart' : 'Texture'}: ${textureLabel} (${dataset.soil.clayPercent}% ${
-      lang === 'de' ? 'Ton' : 'Clay'
-    }, ${dataset.soil.siltPercent}% ${lang === 'de' ? 'Schluff' : 'Silt'}, ${dataset.soil.sandPercent}% Sand)  |  pH ${dataset.soil.ph.toFixed(
-      1
-    )}  |  ${lang === 'de' ? 'Org. Kohlenstoff' : 'Org. Carbon'}: ${dataset.soil.socPercent.toFixed(2)}%`,
-    10,
-    5
-  );
-  y += 4;
-
-  // Section 2: Climate Trend Statistics
-  doc.setTextColor(20, 24, 30);
-  writeWrapped(
-    lang === 'de'
-      ? '2. Klimaverlauf & Trendtest (1990–2025)'
-      : '2. Climate Trends & Mann-Kendall Test (1990–2025)',
-    12,
-    6,
-    true
-  );
-  y += 1;
-  doc.setTextColor(50, 58, 68);
+  const cols = [marginX, marginX + 50, marginX + 88, marginX + 102, marginX + 124, pageWidth - marginX];
+  const head = de
+    ? ['Variable', 'Trend / Dekade', 'Z', 'p-Wert', 'Einordnung']
+    : ['Variable', 'Trend / decade', 'Z', 'p-value', 'Classification'];
+  doc.setFillColor(238, 242, 245);
+  doc.rect(marginX, y - 4, maxWidth, 6.5, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(...MUTED);
+  head.forEach((h, i) => doc.text(h, cols[i] + 1.5, y));
+  y += 6.5;
 
   const vars: ClimateVariable[] = ['T2M', 'PRECTOTCORR', 'GWETROOT', 'EVLAND'];
   for (const v of vars) {
     const st = statsByVariable[v];
-    const meta = VARIABLE_META[v];
-    const label = VARIABLE_TEXT[lang][v].label;
     const dec = v === 'GWETROOT' ? 3 : 2;
     const sign = st.sensSlopePerDecade >= 0 ? '+' : '';
     const pTxt = st.pValue < 0.001 ? '< 0.001' : st.pValue.toFixed(4);
-    const classTxt = localizeTrendClassification(st, lang);
-    const activeMark = v === selectedVariable ? (lang === 'de' ? ' [Aktiv]' : ' [Active]') : '';
-
-    writeWrapped(
-      `• ${label}${activeMark}: ${sign}${st.sensSlopePerDecade.toFixed(dec)} ${unitLabel(v, lang)}/${
-        lang === 'de' ? 'Dekade' : 'decade'
-      }  |  Z = ${st.mannKendallZ.toFixed(2)}, p = ${pTxt} (${st.confidencePct.toFixed(1)}%) — ${classTxt}`,
-      9.5,
-      4.8
+    const label = VARIABLE_TEXT[lang][v].label + (v === selectedVariable ? ' •' : '');
+    const cells = [
+      label,
+      `${sign}${st.sensSlopePerDecade.toFixed(dec)} ${unitLabel(v, lang)}`,
+      st.mannKendallZ.toFixed(2),
+      pTxt,
+      localizeTrendClassification(st, lang),
+    ];
+    const wrapped = cells.map(
+      (c, i) => doc.splitTextToSize(clean(c), cols[i + 1] - cols[i] - 2) as string[]
     );
+    const rows = Math.max(...wrapped.map((w) => w.length));
+    ensureSpace(rows * 4.4 + 3);
+    doc.setFont('helvetica', v === selectedVariable ? 'bold' : 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(...DARK);
+    wrapped.forEach((w, i) => doc.text(w, cols[i] + 1.5, y));
+    y += rows * 4.4 + 1.2;
+    doc.setDrawColor(...LINE);
+    doc.line(marginX, y - 2.6, pageWidth - marginX, y - 2.6);
   }
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(...MUTED);
+  y += 1;
+  writeWrapped(
+    de ? '• = aktuell gewählte Variable. Trend: Sen-Steigung.' : '• = currently selected variable. Trend: Sen\'s slope.',
+    8,
+    4
+  );
 
   if (thresholdFinding) {
-    y += 1.5;
+    y += 2;
+    const note = `${de ? 'Schwellenwert-Ausblick' : '2035 Threshold Note'}: ${
+      de ? thresholdFinding.messageDe : thresholdFinding.messageEn
+    }`;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9.5);
+    const lines = doc.splitTextToSize(clean(note), maxWidth - 8) as string[];
+    ensureSpace(lines.length * 4.8 + 6);
+    doc.setFillColor(254, 243, 226);
+    doc.rect(marginX, y - 3.5, maxWidth, lines.length * 4.8 + 4, 'F');
+    doc.setFillColor(217, 119, 6);
+    doc.rect(marginX, y - 3.5, 1.2, lines.length * 4.8 + 4, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9.5);
     doc.setTextColor(140, 75, 10);
-    writeWrapped(
-      `${lang === 'de' ? 'Schwellenwert-Ausblick' : '2035 Threshold Note'}: ${
-        lang === 'de' ? thresholdFinding.messageDe : thresholdFinding.messageEn
-      }`,
-      9.5,
-      4.8,
-      true
-    );
+    doc.setLineHeightFactor(4.8 / (9.5 * 0.3528));
+    doc.text(lines, marginX + 4, y);
+    y += lines.length * 4.8 + 3;
   }
-  y += 4;
 
-  // Section 3: Crop Rotation Scenarios
-  doc.setTextColor(20, 24, 30);
-  writeWrapped(
-    lang === 'de' ? '3. 3-Jahres-Fruchtfolgen im Vergleich' : '3. 3-Year Crop Rotation Scenarios',
-    12,
-    6,
-    true
-  );
-  y += 1;
-
+  // 3. Rotation scenarios with fit bar
+  section(de ? '3-Jahres-Fruchtfolgen im Vergleich' : '3-Year Crop Rotation Scenarios');
   for (const sc of scenarios) {
-    doc.setTextColor(20, 24, 30);
-    writeWrapped(`• ${sc.title} (${sc.fitScore}/100) — ${sc.cropsSummary}`, 10, 5, true);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9.2);
+    const bodyLines =
+      (doc.splitTextToSize(clean(sc.whySuggested), maxWidth) as string[]).length +
+      (doc.splitTextToSize(clean(sc.cropsSummary), maxWidth) as string[]).length;
+    ensureSpace(14 + bodyLines * 4.5);
+    doc.setTextColor(...DARK);
+    writeWrapped(sc.title, 10.5, 5, true);
+    // fit score bar
+    const barW = 40;
+    doc.setFillColor(...LINE);
+    doc.roundedRect(marginX, y - 2, barW, 2.2, 1, 1, 'F');
+    doc.setFillColor(...GREEN);
+    doc.roundedRect(marginX, y - 2, Math.max(1.5, (barW * sc.fitScore) / 100), 2.2, 1, 1, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(...GREEN);
+    doc.text(`${sc.fitScore}/100`, marginX + barW + 2.5, y);
+    y += 4.5;
+    doc.setTextColor(...MUTED);
+    writeWrapped(sc.cropsSummary, 9, 4.4);
     doc.setTextColor(65, 74, 86);
-    writeWrapped(`  ${sc.whySuggested}`, 9.3, 4.6);
-    y += 1.5;
+    writeWrapped(sc.whySuggested, 9.2, 4.5);
+    y += 3;
   }
 
-  // Section 4: Site Summary if available
+  // 4. Site summary
   if (briefing) {
-    y += 3;
-    doc.setTextColor(20, 24, 30);
-    writeWrapped(
-      lang === 'de' ? '4. Standort-Auswertung' : '4. Site Summary',
-      12,
-      6,
-      true
-    );
-    y += 1;
+    section(de ? 'Standort-Auswertung' : 'Site Summary');
     doc.setTextColor(50, 58, 68);
     writeWrapped(briefing.executiveSummary, 9.5, 4.8);
     y += 2;
     for (const action of briefing.recommendedActionPlan) {
-      writeWrapped(`- ${action}`, 9.3, 4.6);
+      doc.setFillColor(...GREEN);
+      ensureSpace(6);
+      doc.circle(marginX + 1.2, y - 1.2, 0.7, 'F');
+      writeWrapped(action, 9.3, 4.6, false, marginX + 4);
+      y += 0.8;
     }
+  }
+
+  // Footer on every page
+  const pages = doc.getNumberOfPages();
+  for (let p = 1; p <= pages; p++) {
+    doc.setPage(p);
+    doc.setDrawColor(...LINE);
+    doc.line(marginX, pageHeight - 13, pageWidth - marginX, pageHeight - 13);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...MUTED);
+    doc.text(
+      de
+        ? 'AgriShift · Daten: NASA POWER, ISRIC SoilGrids, Copernicus'
+        : 'AgriShift · Data: NASA POWER, ISRIC SoilGrids, Copernicus',
+      marginX,
+      pageHeight - 8
+    );
+    doc.text(`${p} / ${pages}`, pageWidth - marginX, pageHeight - 8, { align: 'right' });
   }
 
   doc.save(`agrishift_${slug || 'site'}_${selectedVariable}.pdf`);

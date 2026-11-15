@@ -193,8 +193,7 @@ export function getCurrentBrowserLocation(lang: AppLanguage = 'de'): Promise<{
       return;
     }
 
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
+    const onSuccess: PositionCallback = async (position) => {
         const lat = Number(position.coords.latitude.toFixed(4));
         const lon = Number(position.coords.longitude.toFixed(4));
         const resolvedName = await reverseGeocode(lat, lon, lang);
@@ -203,8 +202,8 @@ export function getCurrentBrowserLocation(lang: AppLanguage = 'de'): Promise<{
           lon,
           label: `${resolvedName} (${lang === 'de' ? 'Aktueller Standort' : 'Current Location'})`,
         });
-      },
-      (err) => {
+    };
+    const onError: PositionErrorCallback = (err) => {
         if (err.code === err.PERMISSION_DENIED) {
           reject(
             new Error(
@@ -230,12 +229,20 @@ export function getCurrentBrowserLocation(lang: AppLanguage = 'de'): Promise<{
             )
           );
         }
+    };
+
+    // GPS / Wi-Fi fix first (exact, no cached position); if that is not available fall back to a coarse one
+    navigator.geolocation.getCurrentPosition(
+      onSuccess,
+      (err) => {
+        if (err.code === err.PERMISSION_DENIED) return onError(err);
+        navigator.geolocation.getCurrentPosition(onSuccess, onError, {
+          enableHighAccuracy: false,
+          timeout: 8000,
+          maximumAge: 60000,
+        });
       },
-      {
-        enableHighAccuracy: false,
-        timeout: 8000,
-        maximumAge: 60000,
-      }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
   });
 }

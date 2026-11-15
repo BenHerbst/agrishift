@@ -131,65 +131,6 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-function metersToLatDeg(meters: number): number {
-  return meters / 111320;
-}
-
-function metersToLonDeg(meters: number, lat: number): number {
-  const cosLat = Math.max(0.25, Math.cos((lat * Math.PI) / 180));
-  return meters / (111320 * cosLat);
-}
-
-/**
- * Subtle 5x5 reference parcel grid (250m x 250m = 6.25 ha per cell)
- * to help gauge field scale while drawing.
- */
-function buildReferenceGridGeoJson(lat: number, lon: number): GeoJsonData {
-  const cellLat = metersToLatDeg(250);
-  const cellLon = metersToLonDeg(250, lat);
-  const features: Array<{
-    type: 'Feature';
-    id: number;
-    properties: { isActive: boolean };
-    geometry: { type: 'Polygon'; coordinates: number[][][] };
-  }> = [];
-
-  let id = 1;
-  for (let r = -2; r <= 2; r++) {
-    for (let c = -2; c <= 2; c++) {
-      const cLat = lat + r * cellLat;
-      const cLon = lon + c * cellLon;
-      const minLat = clamp(cLat - cellLat / 2, -85, 85);
-      const maxLat = clamp(cLat + cellLat / 2, -85, 85);
-      const minLon = cLon - cellLon / 2;
-      const maxLon = cLon + cellLon / 2;
-
-      features.push({
-        type: 'Feature',
-        id: id++,
-        properties: { isActive: r === 0 && c === 0 },
-        geometry: {
-          type: 'Polygon',
-          coordinates: [
-            [
-              [minLon, minLat],
-              [maxLon, minLat],
-              [maxLon, maxLat],
-              [minLon, maxLat],
-              [minLon, minLat],
-            ],
-          ],
-        },
-      });
-    }
-  }
-
-  return {
-    type: 'FeatureCollection',
-    features,
-  };
-}
-
 function buildDrawnFieldGeoJson(drawnField: DrawnFieldPolygon | null): GeoJsonData {
   if (!drawnField || drawnField.coordinates.length < 3) {
     return { type: 'FeatureCollection', features: [] };
@@ -338,6 +279,7 @@ const SAT_ICONS: Record<GibsLayerId, typeof Thermometer> = {
 // NASA GIBS rasters: two sources take turns so a new date fades in only once its tiles are there
 const SAT_IDS = ['gibs-a', 'gibs-b'] as const;
 const SAT_OPACITY = 0.82;
+const SAT_FADE_MS = 700;
 
 function hexToRgba(hex: string, alpha: number): string {
   const n = parseInt(hex.slice(1), 16);
@@ -461,7 +403,15 @@ export function GeospatialMap({
   const [heatCursorValue, setHeatCursorValue] = useState<number | null>(null);
   const [heatTooClose, setHeatTooClose] = useState<boolean>(false);
   const [satLayer, setSatLayer] = useState<GibsLayerId | null>(null);
-  const satRef = useRef({ front: 0, pending: -1, key: '', fadeTimer: 0 as ReturnType<typeof setTimeout> | 0 });
+  const satRef = useRef({
+    front: 0,
+    pending: -1,
+    key: '',
+    fadeTimer: 0 as ReturnType<typeof setTimeout> | 0,
+    settleTimer: 0 as ReturnType<typeof setTimeout> | 0,
+    settling: false,
+    wanted: null as { layerId: GibsLayerId; date: string } | null,
+  });
 
   const heatLayerRef = useRef(heatLayer);
   heatLayerRef.current = heatLayer;
@@ -539,61 +489,6 @@ export function GeospatialMap({
     const beforeSymbolId = getFirstBasemapSymbolId(map);
     const beforeId =
       beforeSymbolId && map.getLayer(beforeSymbolId) ? beforeSymbolId : undefined;
-
-    // 1. Subtle 250m x 250m scale reference grid when no field polygon is active
-    const showGrid = !curField;
-    const gridData = buildReferenceGridGeoJson(curLat, curLon);
-    const gridSource = map.getSource('site-neighborhood-source') as
-      | mapboxgl.GeoJSONSource
-      | undefined;
-    if (!gridSource) {
-      map.addSource('site-neighborhood-source', {
-        type: 'geojson',
-        data: gridData,
-      });
-    } else {
-      gridSource.setData(gridData);
-    }
-
-    if (!map.getLayer('site-neighborhood-outline')) {
-      map.addLayer(
-        {
-          id: 'site-neighborhood-outline',
-          type: 'line',
-          source: 'site-neighborhood-source',
-          layout: {
-            visibility: showGrid ? 'visible' : 'none',
-          },
-          paint: {
-            'line-color': [
-              'case',
-              ['boolean', ['get', 'isActive'], false],
-              '#10b981',
-              '#CBD5E1',
-            ],
-            'line-width': [
-              'case',
-              ['boolean', ['get', 'isActive'], false],
-              1.4,
-              0.65,
-            ],
-            'line-opacity': [
-              'case',
-              ['boolean', ['get', 'isActive'], false],
-              0.7,
-              0.26,
-            ],
-          },
-        },
-        beforeId
-      );
-    } else {
-      map.setLayoutProperty(
-        'site-neighborhood-outline',
-        'visibility',
-        showGrid ? 'visible' : 'none'
-      );
-    }
 
     // 2. Confirmed drawn field polygon highlight
     const drawnData = buildDrawnFieldGeoJson(curField);
@@ -863,6 +758,7 @@ export function GeospatialMap({
     const now = performance.now();
     const duration = clamp(now - h.lastChange, 400, 1200);
     h.lastChange = now;
+    const cells = h.cells;
     const target = heatWeightMap(data);
     h.data[h.front] = data;
     const from = new Map(h.shown);
@@ -880,6 +776,12 @@ export function GeospatialMap({
         return { ...f, properties: { w } };
       });
       h.shown = shown;
+      // Zoomed in, the heatmap gives way to the coloured grid cells: glide those with the same weights
+      const cellFeatures = (cells as { features: Array<{ properties: { w: number } }> }).features;
+      (map.getSource('heat-cells-source') as mapboxgl.GeoJSONSource | undefined)?.setData({
+        type: 'FeatureCollection',
+        features: cellFeatures.map((c, j) => ({ ...c, properties: { w: frame[j]?.properties.w ?? c.properties.w } })),
+      } as GeoJsonData);
       (map.getSource(HEAT_SOURCE_IDS[h.front]) as mapboxgl.GeoJSONSource | undefined)?.setData({
         type: 'FeatureCollection',
         features: frame,
@@ -900,7 +802,6 @@ export function GeospatialMap({
     const sameLayer = h.visible && !h.pending && h.layerId === layerId && h.shown.size > 0;
     h.layerId = layerId;
     if (sameLayer) {
-      (map.getSource('heat-cells-source') as mapboxgl.GeoJSONSource | undefined)?.setData(h.cells);
       tweenHeatFrame(map, data);
       return;
     }
@@ -950,10 +851,24 @@ export function GeospatialMap({
     clearTimeout(sat.fadeTimer);
     const next = sat.pending;
     sat.pending = -1;
-    SAT_IDS.forEach((id, i) => {
-      if (map.getLayer(id)) map.setPaintProperty(id, 'raster-opacity', i === next ? SAT_OPACITY : 0);
-    });
+    // The new frame fades in on top of the old one, which stays fully visible until it is covered:
+    // fading both at once would dip to a see-through mix of the two halfway
+    const prev = sat.front;
+    if (map.getLayer(SAT_IDS[next])) map.setPaintProperty(SAT_IDS[next], 'raster-opacity', SAT_OPACITY);
     sat.front = next;
+    // Let the cross-fade finish before the faded-out layer is reused, then go to the newest wanted frame
+    sat.settling = true;
+    clearTimeout(sat.settleTimer);
+    sat.settleTimer = setTimeout(() => {
+      sat.settling = false;
+      if (map.getLayer(SAT_IDS[prev]) && prev !== sat.front) {
+        map.setPaintProperty(SAT_IDS[prev], 'raster-opacity-transition', { duration: 0, delay: 0 });
+        map.setPaintProperty(SAT_IDS[prev], 'raster-opacity', 0);
+      }
+      const w = sat.wanted;
+      sat.wanted = null;
+      if (w) pushSatFrame(map, w.layerId, w.date);
+    }, SAT_FADE_MS + 50);
   };
 
   /** Loads a GIBS date into the hidden raster, then cross-fades to it. */
@@ -961,7 +876,17 @@ export function GeospatialMap({
     const sat = satRef.current;
     const key = `${layerId}/${date}`;
     const spec = GIBS_LAYERS[layerId];
-    if (sat.key === key && map.getLayer(SAT_IDS[sat.front])) return;
+    if (sat.key === key && map.getLayer(SAT_IDS[sat.front])) {
+      sat.wanted = null;
+      return;
+    }
+    // While a frame loads or fades, only remember the newest one: replacing a loading frame during
+    // playback would never let any frame finish loading, so the layer froze or vanished
+    if ((sat.pending >= 0 || sat.settling) && sat.key.startsWith(`${layerId}/`)) {
+      sat.wanted = { layerId, date };
+      return;
+    }
+    sat.wanted = null;
     sat.key = key;
     const back = 1 - sat.front;
     const id = SAT_IDS[back];
@@ -981,12 +906,12 @@ export function GeospatialMap({
         source: id,
         paint: {
           'raster-opacity': 0,
-          'raster-opacity-transition': { duration: 450, delay: 0 },
+          'raster-opacity-transition': { duration: SAT_FADE_MS, delay: 0 },
           'raster-resampling': spec.resampling,
           'raster-fade-duration': 0,
         },
       },
-      map.getLayer('site-neighborhood-outline') ? 'site-neighborhood-outline' : undefined
+      getFirstBasemapSymbolId(map)
     );
     sat.pending = back;
     clearTimeout(sat.fadeTimer);
@@ -996,7 +921,10 @@ export function GeospatialMap({
   const hideSat = (map: mapboxgl.Map) => {
     const sat = satRef.current;
     clearTimeout(sat.fadeTimer);
+    clearTimeout(sat.settleTimer);
     sat.pending = -1;
+    sat.settling = false;
+    sat.wanted = null;
     sat.key = '';
     SAT_IDS.forEach((id) => {
       if (map.getLayer(id)) map.setPaintProperty(id, 'raster-opacity', 0);
