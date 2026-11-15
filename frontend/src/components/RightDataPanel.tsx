@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   Area,
   CartesianGrid,
@@ -35,6 +35,7 @@ import {
 import { BASELINE_CROP_OPTIONS } from '../utils/rotationEngine';
 import { ForecastRiskPanel } from './ForecastRiskPanel';
 import { ForecastRotationCard } from './ForecastRotationCard';
+import { RotationCompareCard } from './RotationCompareCard';
 import type { RotationPlan } from '../services/climateForecastService';
 import {
   DISPLAY_START_YEAR,
@@ -46,15 +47,11 @@ import {
 import type {
   AgroBriefingResponse,
   AnnualPoint,
-  BaselineCropId,
   ClimateForecastDataset,
   ClimateVariable,
-  CropCalendarMonthCell,
   EarthSystemDataset,
-  FarmerPriorities,
   ForecastLoadStatus,
   ForecastMode,
-  RotationScenario,
   SeasonalWindow,
   ThresholdFinding,
   TrendStatistics,
@@ -88,11 +85,6 @@ interface RightDataPanelProps {
   onSelectVariable: (v: ClimateVariable) => void;
   onSelectWindow: (w: SeasonalWindow) => void;
   onSelectForecastMode: (m: ForecastMode) => void;
-  baselineCrop: BaselineCropId;
-  onChangeBaselineCrop: (crop: BaselineCropId) => void;
-  priorities: FarmerPriorities;
-  onChangePriority: (key: keyof FarmerPriorities, value: number) => void;
-  scenarios: RotationScenario[];
   briefing: AgroBriefingResponse | null;
   isBriefingLoading: boolean;
   briefingError: string | null;
@@ -126,11 +118,6 @@ export function RightDataPanel({
   onSelectVariable,
   onSelectWindow,
   onSelectForecastMode,
-  baselineCrop,
-  onChangeBaselineCrop,
-  priorities,
-  onChangePriority,
-  scenarios,
   briefing,
   isBriefingLoading,
   briefingError,
@@ -144,25 +131,6 @@ export function RightDataPanel({
   const windowText = SEASONAL_TEXT[lang];
   const monthNames = MONTH_SHORT_BY_LANG[lang];
   const decimals = selectedVariable === 'GWETROOT' ? 3 : 2;
-
-  const [selectedScenarioId, setSelectedScenarioId] = useState<RotationScenario['id']>('hydro_resilient');
-  const [selectedMonthCell, setSelectedMonthCell] = useState<{
-    yearLabel: string;
-    cell: CropCalendarMonthCell;
-  } | null>(null);
-
-  useEffect(() => {
-    if (scenarios.length === 0) return;
-    const bestAlternative =
-      [...scenarios]
-        .filter((s) => s.id !== 'baseline')
-        .sort((a, b) => b.fitScore - a.fitScore)[0] ?? scenarios[0];
-    setSelectedScenarioId(bestAlternative.id);
-    setSelectedMonthCell(null);
-  }, [scenarios]);
-
-  const activeScenario =
-    scenarios.find((s) => s.id === selectedScenarioId) ?? scenarios[0] ?? null;
 
   const isNegativeWarning = Boolean(
     stats?.isSignificant &&
@@ -314,18 +282,6 @@ export function RightDataPanel({
             periodEndLabel={periodEndLabel}
             lang={lang}
             t={t}
-            baselineCrop={baselineCrop}
-            onChangeBaselineCrop={onChangeBaselineCrop}
-            priorities={priorities}
-            onChangePriority={onChangePriority}
-            scenarios={scenarios}
-            activeScenario={activeScenario}
-            onSelectScenario={(id) => {
-              setSelectedScenarioId(id);
-              setSelectedMonthCell(null);
-            }}
-            selectedMonthCell={selectedMonthCell}
-            onSelectMonthCell={setSelectedMonthCell}
             rotationPlan={rotationPlan}
             rotationStatus={rotationStatus}
           />
@@ -1095,15 +1051,6 @@ function FieldShiftTabView({
   periodEndLabel,
   lang,
   t,
-  baselineCrop,
-  onChangeBaselineCrop,
-  priorities,
-  onChangePriority,
-  scenarios,
-  activeScenario,
-  onSelectScenario,
-  selectedMonthCell,
-  onSelectMonthCell,
   rotationPlan,
   rotationStatus,
 }: {
@@ -1113,24 +1060,9 @@ function FieldShiftTabView({
   periodEndLabel: string;
   lang: 'de' | 'en';
   t: ReturnType<typeof useI18n>['t'];
-  baselineCrop: BaselineCropId;
-  onChangeBaselineCrop: (crop: BaselineCropId) => void;
-  priorities: FarmerPriorities;
-  onChangePriority: (key: keyof FarmerPriorities, value: number) => void;
-  scenarios: RotationScenario[];
-  activeScenario: RotationScenario | null;
-  onSelectScenario: (id: RotationScenario['id']) => void;
-  selectedMonthCell: { yearLabel: string; cell: CropCalendarMonthCell } | null;
-  onSelectMonthCell: (item: { yearLabel: string; cell: CropCalendarMonthCell } | null) => void;
   rotationPlan: RotationPlan | null;
   rotationStatus: 'idle' | 'loading' | 'ready' | 'error';
 }) {
-  const priorityItems: Array<{ key: keyof FarmerPriorities; label: string }> = [
-    { key: 'water', label: t.fieldShift.priorities.water },
-    { key: 'nitrogen', label: t.fieldShift.priorities.nitrogen },
-    { key: 'erosion', label: t.fieldShift.priorities.erosion },
-    { key: 'profit', label: t.fieldShift.priorities.profit },
-  ];
 
   return (
     <div role="tabpanel" className="space-y-5">
@@ -1229,224 +1161,7 @@ function FieldShiftTabView({
       </div>
 
       <ForecastRotationCard plan={rotationPlan} status={rotationStatus} lang={lang} />
-
-      {/* Baseline Crop & Farm Priorities */}
-      <div className="border border-line bg-ground p-4 space-y-4">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h3 className="text-sm font-semibold text-ink">{t.fieldShift.title}</h3>
-            <p className="text-xs text-ink-2">{t.fieldShift.subtitle}</p>
-          </div>
-          <div className="sm:w-64">
-            <label htmlFor="baseline-crop-select" className="sr-only">
-              {t.fieldShift.baselineLabel}
-            </label>
-            <select
-              id="baseline-crop-select"
-              value={baselineCrop}
-              onChange={(e) => onChangeBaselineCrop(e.target.value as BaselineCropId)}
-              className="w-full rounded-md border border-line bg-panel px-3 py-1.5 text-xs text-ink focus:border-crop focus:outline-none transition-colors duration-200 ease-out"
-            >
-              {BASELINE_CROP_OPTIONS.map((opt) => (
-                <option key={opt.id} value={opt.id}>
-                  {BASELINE_CROP_TEXT[lang][opt.id].label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5 border-t border-line pt-3">
-          {priorityItems.map((item) => (
-            <label key={item.key} className="flex items-center justify-between gap-3 text-xs">
-              <span className="text-ink-2 w-36 shrink-0">{item.label}</span>
-              <input
-                type="range"
-                min={10}
-                max={100}
-                step={5}
-                value={priorities[item.key]}
-                onChange={(e) => onChangePriority(item.key, Number(e.target.value))}
-                className="flex-1 accent-crop cursor-pointer"
-              />
-              <span className="font-mono text-[11px] tabular-nums text-ink w-8 text-right">
-                {priorities[item.key]}
-              </span>
-            </label>
-          ))}
-        </div>
-      </div>
-
-      {/* Asymmetric Scenario Selector & Detail */}
-      {activeScenario && (
-        <div className="border border-line bg-ground">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-line border-b border-line">
-            {scenarios.map((scenario) => {
-              const selected = scenario.id === activeScenario.id;
-              return (
-                <button
-                  key={scenario.id}
-                  type="button"
-                  onClick={() => onSelectScenario(scenario.id)}
-                  className={`p-3.5 text-left transition-colors duration-200 ease-out cursor-pointer ${
-                    selected ? 'bg-raised' : 'bg-ground hover:bg-panel'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] text-ink-2">{scenario.badgeLabel}</span>
-                    <span
-                      className={`font-mono text-xs font-semibold tabular-nums ${
-                        selected ? 'text-crop' : 'text-ink'
-                      }`}
-                    >
-                      {scenario.fitScore}/100
-                    </span>
-                  </div>
-                  <div className="mt-1 text-xs font-semibold text-ink">{scenario.title}</div>
-                  <div className="mt-0.5 text-[11px] text-ink-3 line-clamp-1">
-                    {scenario.cropsSummary}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="p-4 space-y-4">
-            <div className="space-y-1">
-              <div className="text-xs font-semibold text-ink">{t.fieldShift.whySuggested}</div>
-              <p className="text-xs leading-relaxed text-ink-2">{activeScenario.whySuggested}</p>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-line pt-3.5">
-              <div className="space-y-1.5">
-                <div className="text-xs font-semibold text-crop">
-                  {t.fieldShift.expectedBenefits}
-                </div>
-                <ul className="space-y-1 text-xs leading-relaxed text-ink">
-                  {activeScenario.expectedBenefits.map((benefit, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-crop shrink-0" />
-                      <span>{benefit}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="space-y-1.5">
-                <div className="text-xs font-semibold text-warn">
-                  {t.fieldShift.risksValidation}
-                </div>
-                <ul className="space-y-1 text-xs leading-relaxed text-ink-2">
-                  {activeScenario.risksAndValidation.map((risk, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-warn shrink-0" />
-                      <span>{risk}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-
-            {/* Compact 36-Month Cover & Stress Calendar */}
-            <div className="border-t border-line pt-3.5 space-y-2.5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <h4 className="text-xs font-semibold text-ink">
-                    {t.fieldShift.calendarTitle}
-                  </h4>
-                  <p className="text-[11px] text-ink-3">{t.fieldShift.calendarSubtitle}</p>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-3 text-[11px] text-ink-2">
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="h-2.5 w-2.5 bg-line-strong" />
-                    <span>{t.fieldShift.legendCash}</span>
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="h-2.5 w-2.5 bg-crop/75" />
-                    <span>{t.fieldShift.legendCover}</span>
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="h-2.5 w-2.5 bg-warn/75" />
-                    <span>{t.fieldShift.legendBare}</span>
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                {activeScenario.calendarYears.map((yr) => (
-                  <div key={yr.yearNumber} className="space-y-1">
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="font-mono text-ink font-medium">{yr.yearLabel}</span>
-                      <span className="text-ink-3 truncate ml-2">{yr.sequenceTitle}</span>
-                    </div>
-                    <div className="grid grid-cols-6 sm:grid-cols-12 gap-1">
-                      {yr.months.map((cell) => {
-                        const isSelected =
-                          selectedMonthCell?.yearLabel === yr.yearLabel &&
-                          selectedMonthCell?.cell.month === cell.month;
-                        const isActiveTimelineMonth = activeMonths.includes(cell.month);
-                        const bgClass =
-                          cell.coverStatus === 'cover'
-                            ? 'bg-crop/20 border-crop/45 text-crop'
-                            : cell.coverStatus === 'bare_risk'
-                            ? 'bg-warn/20 border-warn/45 text-warn'
-                            : 'bg-raised border-line-strong text-ink';
-                        return (
-                          <button
-                            key={cell.month}
-                            type="button"
-                            onClick={() => onSelectMonthCell({ yearLabel: yr.yearLabel, cell })}
-                            title={`${cell.monthLabel}: ${cell.cropName}`}
-                            className={`rounded-md border px-1 py-1.5 text-center transition-colors duration-200 ease-out cursor-pointer ${bgClass} ${
-                              isSelected
-                                ? 'ring-1 ring-ink'
-                                : isActiveTimelineMonth
-                                ? 'ring-1 ring-crop/80'
-                                : ''
-                            }`}
-                          >
-                            <div className="font-mono text-[10px] leading-none">
-                              {cell.monthLabel}
-                            </div>
-                            <div className="mt-1 flex justify-center">
-                              <span
-                                className={`h-1 w-1 rounded-full ${
-                                  cell.stressFlag === 'heat_stress'
-                                    ? 'bg-warn'
-                                    : cell.stressFlag === 'water_stress'
-                                    ? 'bg-ink'
-                                    : 'bg-transparent'
-                                }`}
-                              />
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="border border-line bg-panel px-3 py-2 text-xs text-ink-2">
-                {selectedMonthCell ? (
-                  <div>
-                    <span className="font-mono font-semibold text-ink">
-                      {selectedMonthCell.yearLabel} · {selectedMonthCell.cell.monthLabel}:
-                    </span>{' '}
-                    <span className="text-crop font-medium">
-                      {selectedMonthCell.cell.cropName}
-                    </span>{' '}
-                    — {selectedMonthCell.cell.note}
-                  </div>
-                ) : (
-                  <span>{t.fieldShift.hoverHint}</span>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <RotationCompareCard lat={dataset.lat} lon={dataset.lon} enabled={rotationStatus === 'ready'} lang={lang} />
     </div>
   );
 }

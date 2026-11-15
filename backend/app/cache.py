@@ -27,7 +27,8 @@ from .data import CACHE_DIR
 FORECAST_DIR = CACHE_DIR / "forecasts"
 KEEP_PER_LOCATION = 2
 # Modules that only present or post-process a finished forecast – editing them keeps cached entries
-_NOT_IN_FORECAST = {"__init__.py", "main.py", "cache.py", "risk.py", "soil.py", "pollution.py", "rotation.py"}
+_NOT_IN_FORECAST = {"__init__.py", "main.py", "cache.py", "risk.py", "soil.py", "pollution.py", "rotation.py",
+                    "rotation_compare.py"}
 
 
 def _code_version() -> str:

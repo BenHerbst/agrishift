@@ -24,7 +24,8 @@ from .features import MONTHLY_VARIABLES, period_means, to_monthly
 from .members import MAX_HORIZON_MONTHS, PROPHET_AVAILABLE
 from .pollution import SOURCES, crop_safety, fetch_infrastructure, read_air_quality
 from .risk import BASE_YEARS, RECENT_YEARS, seasonal_risk
-from .rotation import CROPS, plan_rotation
+from .rotation import CROPS, forecast_frame, plan_rotation, yearly_crop_scores
+from .rotation_compare import DIMENSIONS, compare as compare_rotations, parse_weights
 from .seasonal import fetch_seasonal
 from .soil import DEFAULT_ROOT_DEPTH_CM, fetch_soil, historical_water_stats, soil_profile
 from .sources import fetch_daily, fetch_projections
@@ -457,13 +458,53 @@ def pollution(lat: float = LatQuery, lon: float = LonQuery):
         raise HTTPException(status_code=502, detail=f"Could not load OpenStreetMap data: {exc}")
 
 
+HistoryQuery = Query(None, description=f"Crops of the last years, oldest first, comma-separated. "
+                                       f"Known crops: {', '.join(CROPS)}")
+
+
+def _crop_list(text: Optional[str]) -> List[str]:
+    crops = [c.strip() for c in (text or "").split(",") if c.strip()]
+    unknown = [c for c in crops if c not in CROPS]
+    if unknown:
+        raise HTTPException(status_code=400, detail=f"Unknown crops: {unknown}. Known crops: {list(CROPS)}")
+    return crops
+
+
+def _rotation_inputs(lat: float, lon: float, years: int, use_pollution: bool, refresh: bool) -> Dict:
+    """Forecast, soil and pollution for one field, as the rotation endpoints need them."""
+    key = _key(lat, lon)
+    result, cache_info = _upstream(_location, *key, refresh)
+    horizon = min(years * 12, MAX_HORIZON_MONTHS)
+    taw = ph = texture = None
+    try:
+        profile = soil_profile(_soil(*key))
+        taw, ph, texture = profile["total_available_water_mm"], profile["topsoil_0_30cm"]["ph"], profile["texture_class"]
+        soil_info = {"texture_class": texture, "ph": ph, "total_available_water_mm": taw}
+    except Exception as exc:
+        soil_info = {"error": f"No soil data, soil storage and pH left out: {exc}"}
+    safety = aot40 = pollution_info = None
+    if use_pollution:
+        try:
+            safety = _site_pollution(lat, lon)
+            aot40 = safety["air_quality"].get("ozone_aot40_may_jul_ug_m3_h")
+            pollution_info = {g: v["verdict"] for g, v in safety["crop_groups"].items()}
+        except Exception as exc:
+            safety = None
+            pollution_info = {"error": f"No pollution data, left out: {exc}"}
+    return {
+        "forecasts": {v: r["forecast"][:horizon] for v, r in result["variables"].items()},
+        "taw": taw, "ph": ph, "texture": texture, "safety": safety, "aot40": aot40,
+        "meta": {"latitude": lat, "longitude": lon, "cache": cache_info, "sources": result["sources"],
+                 "soil": soil_info, "pollution": pollution_info},
+    }
+
+
 @app.get("/rotation")
 def rotation(
     lat: float = LatQuery,
     lon: float = LonQuery,
     years: int = Query(3, ge=1, le=3),
-    history: Optional[str] = Query(None, description=f"Crops of the last years, oldest first, comma-separated. "
-                                                     f"Known crops: {', '.join(CROPS)}"),
+    history: Optional[str] = HistoryQuery,
     use_pollution: bool = Query(True, description="Leave out crops that are unsafe here because of nearby pollution"),
     refresh: bool = Query(False, description="Ignore the cached forecast and retrain (~25 s)"),
 ):
@@ -471,44 +512,56 @@ def rotation(
     growing months, the soil and nearby pollution, and chosen so the rotation stays healthy (breaks
     between crop families, legumes before nitrogen-hungry crops). Each year lists the alternatives too.
     """
-    planted = [c.strip() for c in (history or "").split(",") if c.strip()]
-    unknown = [c for c in planted if c not in CROPS]
-    if unknown:
-        raise HTTPException(status_code=400, detail=f"Unknown crops: {unknown}. Known crops: {list(CROPS)}")
-    key = _key(lat, lon)
-    result, cache_info = _upstream(_location, *key, refresh)
-    horizon = min(years * 12, MAX_HORIZON_MONTHS)
-    forecasts = {v: r["forecast"][:horizon] for v, r in result["variables"].items()}
-
-    taw = ph = None
-    try:
-        profile = soil_profile(_soil(*key))
-        taw, ph = profile["total_available_water_mm"], profile["topsoil_0_30cm"]["ph"]
-        soil_info = {"texture_class": profile["texture_class"], "ph": ph, "total_available_water_mm": taw}
-    except Exception as exc:
-        soil_info = {"error": f"No soil data, soil storage and pH left out: {exc}"}
-    safety = aot40 = None
-    if use_pollution:
-        try:
-            safety = _site_pollution(lat, lon)
-            aot40 = safety["air_quality"].get("ozone_aot40_may_jul_ug_m3_h")
-        except Exception as exc:
-            safety = None
-            pollution_info = {"error": f"No pollution data, left out: {exc}"}
-        else:
-            pollution_info = {g: v["verdict"] for g, v in safety["crop_groups"].items()}
-    else:
-        pollution_info = None
+    planted = _crop_list(history)
+    inputs = _rotation_inputs(lat, lon, years, use_pollution, refresh)
     return {
-        "latitude": lat,
-        "longitude": lon,
-        "cache": cache_info,
-        "sources": result["sources"],
-        "soil": soil_info,
-        "pollution": pollution_info,
+        **inputs["meta"],
         "history": planted,
-        "plan": plan_rotation(forecasts, lat, planted, taw, ph, safety, aot40),
+        "plan": plan_rotation(inputs["forecasts"], lat, planted, inputs["taw"], inputs["ph"], inputs["safety"],
+                              inputs["aot40"]),
         "crops": {name: crop["family"] for name, crop in CROPS.items()},
+    }
+
+
+@app.get("/rotation/compare")
+def rotation_compare(
+    lat: float = LatQuery,
+    lon: float = LonQuery,
+    years: int = Query(3, ge=1, le=3),
+    history: Optional[str] = HistoryQuery,
+    weights: Optional[str] = Query(None, description=f"How much each dimension counts in the overall score, "
+                                                     f"e.g. 'erosion=2,market=0.5' (default 1 each). "
+                                                     f"Dimensions: {', '.join(DIMENSIONS)}"),
+    rotations: Optional[str] = Query(None, description="Your own rotations to compare, ';'-separated, each a "
+                                                       "','-separated crop per year, e.g. "
+                                                       "'winter_wheat,maize,field_pea;oats,faba_bean,winter_wheat'"),
+    use_pollution: bool = Query(True, description="Leave out crops that are unsafe here because of nearby pollution"),
+    refresh: bool = Query(False, description="Ignore the cached forecast and retrain (~25 s)"),
+):
+    """Rotation scenarios side by side: the climate-best plan, the best rotation for each goal (soil building,
+    water saving, erosion control, forage, market) and your own rotations, each scored 0–100 on climate fit,
+    nutrient cycling, organic matter, erosion risk, pest-cycle disruption, water use, forage potential and
+    market, with the figures behind the scores and what each scenario gains or gives up against the plan /rotation recommends.
+    """
+    planted = _crop_list(history)
+    try:
+        weight_map = parse_weights(weights)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    custom = [_crop_list(r) for r in (rotations or "").split(";") if r.strip()]
+    inputs = _rotation_inputs(lat, lon, years, use_pollution, refresh)
+    year_scores = yearly_crop_scores(forecast_frame(inputs["forecasts"]), lat, inputs["taw"], inputs["ph"],
+                                     inputs["safety"], inputs["aot40"])
+    if any(len(c) != len(year_scores) for c in custom):
+        raise HTTPException(status_code=400, detail=f"Each rotation needs one crop per forecast year "
+                                                    f"({len(year_scores)} here: {[y for y, _ in year_scores]})")
+    plan = plan_rotation(inputs["forecasts"], lat, planted, inputs["taw"], inputs["ph"], inputs["safety"],
+                         inputs["aot40"])
+    annual_rain = float(forecast_frame(inputs["forecasts"])["precip"].mean() * 12)
+    return {
+        **inputs["meta"],
+        "history": planted,
+        **compare_rotations(year_scores, plan, planted, inputs["texture"], annual_rain, weight_map, custom),
     }
 
 

@@ -229,6 +229,23 @@ def _forecast_variable(y: pd.Series, variable: str, indices: pd.DataFrame, preco
     return {"backtest": backtest, "forecast": rows}
 
 
+def derive_water_balance(results: Dict[str, Dict]) -> None:
+    """Make the water-balance forecast equal forecast rain − forecast ET0 (in place).
+
+    The three variables are forecast separately, so their forecasts drift apart by ~20 mm a year and
+    tables like /agri-summary would not add up. The 80 % range keeps its width and moves with the value.
+    The backtest still describes the separately trained water-balance model.
+    """
+    if not all(v in results for v in ("precip", "et0", "water_balance")):
+        return
+    for wb, rain, et0 in zip(results["water_balance"]["forecast"], results["precip"]["forecast"],
+                             results["et0"]["forecast"]):
+        value = round(rain["forecast"] - et0["forecast"], 2)
+        shift = value - wb["forecast"]
+        wb.update(forecast=value, lower_80=round(wb["lower_80"] + shift, 2), upper_80=round(wb["upper_80"] + shift, 2))
+    results["water_balance"]["note"] = "forecast = precipitation − ET0; the backtest is for the separately trained model"
+
+
 def forecast_location(daily: pd.DataFrame, projections_monthly: Optional[pd.DataFrame],
                       indices: pd.DataFrame, variables: Optional[List[str]] = None, n_jobs: int = -1,
                       use_prophet: bool = False, seasonal: Optional[pd.DataFrame] = None,
@@ -267,4 +284,6 @@ def forecast_location(daily: pd.DataFrame, projections_monthly: Optional[pd.Data
     results = Parallel(n_jobs=n_jobs)(
         delayed(_forecast_variable)(monthly[v], v, indices, precomputed, origins, future, opts) for v in variables
     )
-    return {"trained_until": last.strftime("%Y-%m"), "variables": dict(zip(variables, results))}
+    by_variable = dict(zip(variables, results))
+    derive_water_balance(by_variable)
+    return {"trained_until": last.strftime("%Y-%m"), "variables": by_variable}

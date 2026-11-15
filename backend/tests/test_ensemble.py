@@ -34,3 +34,14 @@ def test_forecast_location_end_to_end(daily):
     for ws in tmean["backtest"]["weights_by_lead_months"].values():
         assert abs(sum(ws.values()) - 1) < 0.01
     json.dumps(result)  # no NaN / numpy types leak into the API
+
+
+def test_water_balance_is_rain_minus_et0():
+    from app.ensemble import derive_water_balance
+    row = lambda v, lo=None, hi=None: {"month": "2027-01", "forecast": v, "lower_80": lo, "upper_80": hi}
+    results = {"precip": {"forecast": [row(70.0)]}, "et0": {"forecast": [row(20.0)]},
+               "water_balance": {"forecast": [row(40.0, 30.0, 55.0)]}}
+    derive_water_balance(results)
+    wb = results["water_balance"]["forecast"][0]
+    assert wb["forecast"] == 50.0 and (wb["lower_80"], wb["upper_80"]) == (40.0, 65.0)  # range keeps its width
+    derive_water_balance({"precip": {"forecast": []}})  # missing variables: nothing to do

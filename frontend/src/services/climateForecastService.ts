@@ -352,3 +352,50 @@ export interface RotationPlan {
 export function fetchRotationPlan(lat: number, lon: number, signal?: AbortSignal): Promise<RotationPlan> {
   return getJson<RotationPlan>('/rotation', { lat, lon, years: 3 }, signal);
 }
+
+// ---------------------------------------------------------------------------
+// GET /rotation/compare: rotation scenarios scored side by side.
+// ---------------------------------------------------------------------------
+
+export const ROTATION_DIMENSIONS = [
+  'climate_fit',
+  'nutrient_cycling',
+  'organic_matter',
+  'erosion',
+  'pest_cycle',
+  'water_use',
+  'forage',
+  'market',
+] as const;
+export type RotationDimension = (typeof ROTATION_DIMENSIONS)[number];
+
+export interface RotationScenario {
+  /** recommended_plan, best_climate_fit, soil_building, water_saving, erosion_control, forage, market, balanced, custom_N */
+  labels: string[];
+  rotation: Array<{ year: number; crop: string }>;
+  composite: number;
+  /** 0–100, higher is better */
+  scores: Record<RotationDimension, number>;
+  metrics: {
+    mineral_n_to_buy_kg_per_ha_year: number;
+    n_credit_reused_kg_per_ha: number;
+    humus_balance_kg_c_per_ha_year: number;
+    erosion_risk_index: number;
+    water_demand_mm_per_year: number;
+    water_shortfall_mm_per_year: number;
+    feed_value: number;
+    indicative_margin_index: number;
+  };
+  rule_violations: string[];
+  excluded_for_pollution: string[];
+  best_at: RotationDimension[];
+}
+
+export interface RotationComparison {
+  years: number[];
+  scenarios: RotationScenario[];
+}
+
+export function fetchRotationComparison(lat: number, lon: number, signal?: AbortSignal): Promise<RotationComparison> {
+  return getJson<RotationComparison>('/rotation/compare', { lat, lon, years: 3 }, signal);
+}

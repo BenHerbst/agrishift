@@ -810,11 +810,6 @@ export default function App() {
                   onSelectVariable={setSelectedVariable}
                   onSelectWindow={setSeasonalWindow}
                   onSelectForecastMode={setForecastMode}
-                  baselineCrop={baselineCrop}
-                  onChangeBaselineCrop={setBaselineCrop}
-                  priorities={priorities}
-                  onChangePriority={handlePriorityChange}
-                  scenarios={rotationModel.scenarios}
                   briefing={aiBriefing}
                   isBriefingLoading={isAiLoading}
                   briefingError={aiError}

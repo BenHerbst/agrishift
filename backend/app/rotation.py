@@ -126,7 +126,8 @@ def crop_score(name: str, fc: pd.DataFrame, year: int, lat: float, taw: Optional
             penalty(15, "Pollution caution: " + verdict["reasons"][0])
     if crop["ozone_sensitive"] and aot40:
         penalty(10 if aot40 > AOT40_TARGET else 4 if aot40 > AOT40_LONG_TERM else 0, "Ozone-sensitive crop")
-    return {"score": max(0.0, score), "reasons": reasons or ["Climate and soil suit this crop well"]}
+    return {"score": max(0.0, score), "reasons": reasons or ["Climate and soil suit this crop well"],
+            "water_demand_mm": round(demand), "water_shortfall_mm": round(deficit)}
 
 
 def rotation_block(name: str, planted: List[str]) -> Optional[str]:
@@ -153,15 +154,27 @@ def _rotation_effect(name: str, planted: List[str]):
     return 0, []
 
 
+def forecast_frame(forecasts: Dict[str, List[Dict]]) -> pd.DataFrame:
+    """The /forecast rows (variable -> [{"month": "YYYY-MM", "forecast": value}]) as month × variable."""
+    return pd.DataFrame({var: {pd.Timestamp(r["month"]): r["forecast"] for r in rows} for var, rows in forecasts.items()})
+
+
+def yearly_crop_scores(fc: pd.DataFrame, lat: float, taw: Optional[float] = None, ph: Optional[float] = None,
+                       safety: Optional[Dict] = None, aot40: Optional[float] = None) -> List[tuple]:
+    """[(year, {crop: crop_score result})] for every year whose growing seasons lie fully inside the forecast."""
+    out = []
+    for year in sorted(set(fc.index.year)):
+        results = {name: crop_score(name, fc, year, lat, taw, ph, safety, aot40) for name in CROPS}
+        if not any(r is None for r in results.values()):
+            out.append((int(year), results))
+    return out
+
+
 def plan_rotation(forecasts: Dict[str, List[Dict]], lat: float, history: List[str] = (), taw: Optional[float] = None,
                   ph: Optional[float] = None, safety: Optional[Dict] = None, aot40: Optional[float] = None) -> List[Dict]:
     """`forecasts`: variable -> list of {"month": "YYYY-MM", "forecast": value}; `history`: crops so far, oldest first."""
-    fc = pd.DataFrame({var: {pd.Timestamp(r["month"]): r["forecast"] for r in rows} for var, rows in forecasts.items()})
     planted, plan = list(history), []
-    for year in sorted(set(fc.index.year)):
-        results = {name: crop_score(name, fc, year, lat, taw, ph, safety, aot40) for name in CROPS}
-        if any(r is None for r in results.values()):
-            continue  # part of this year's growing season is outside the forecast
+    for year, results in yearly_crop_scores(forecast_frame(forecasts), lat, taw, ph, safety, aot40):
         options, not_possible = {}, {}
         for name, result in results.items():
             why_not = result.get("excluded") or rotation_block(name, planted)
@@ -175,7 +188,7 @@ def plan_rotation(forecasts: Dict[str, List[Dict]], lat: float, history: List[st
         if best:
             planted.append(best)
         plan.append({
-            "year": int(year),
+            "year": year,
             "crop": best,
             "family": CROPS[best]["family"] if best else None,
             "score": options[best]["score"] if best else None,
