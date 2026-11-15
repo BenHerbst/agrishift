@@ -6,8 +6,10 @@ import {
   FileSpreadsheet,
   FileText,
   Globe,
+  Loader2,
   MapPin,
   Moon,
+  Satellite,
   Sun,
 } from 'lucide-react';
 import { LanguageSwitcher, useI18n } from '../i18n/I18nContext';
@@ -67,6 +69,7 @@ interface HeaderBarProps {
   onExportCsv: () => void;
   onExportGeoJson: () => void;
   onExportPdf: () => void;
+  onOpenSources: () => void;
   drawnField: DrawnFieldPolygon | null;
   onLoadSaved: (field: SavedField) => void;
 }
@@ -82,6 +85,7 @@ export function HeaderBar({
   onExportPdf,
   drawnField,
   onLoadSaved,
+  onOpenSources,
 }: HeaderBarProps) {
   const { t } = useI18n();
   const [exportOpen, setExportOpen] = useState(false);
@@ -138,12 +142,23 @@ export function HeaderBar({
           </button>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 min-w-0">
           {isLoading && (
-            <span className="font-mono text-[11px] text-warn">
-              {t.toolbar.loadingData}
+            <span role="status" title={t.toolbar.loadingData} className="inline-flex items-center text-crop">
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              <span className="sr-only">{t.toolbar.loadingData}</span>
             </span>
           )}
+
+          <button
+            type="button"
+            onClick={onOpenSources}
+            aria-label={t.toolbar.dataSources}
+            className="inline-flex items-center gap-1.5 rounded-md border border-line bg-panel px-3 py-1.5 text-xs text-ink hover:border-crop/50 hover:text-crop transition-colors duration-200 ease-out cursor-pointer whitespace-nowrap"
+          >
+            <Satellite className="h-3.5 w-3.5 text-crop" aria-hidden="true" />
+            <span className="hidden sm:inline">{t.toolbar.dataSources}</span>
+          </button>
 
           <SavedFieldsMenu current={{ lat, lon, name: regionName, field: drawnField }} onLoad={onLoadSaved} />
 
@@ -155,10 +170,11 @@ export function HeaderBar({
               disabled={isLoading}
               aria-expanded={exportOpen}
               aria-haspopup="menu"
+              aria-label={t.ribbon.exportMenu}
               className="inline-flex items-center gap-1.5 rounded-md border border-line bg-panel px-3 py-1.5 text-xs text-ink hover:border-line-strong hover:text-crop transition-colors duration-200 ease-out cursor-pointer disabled:opacity-40 whitespace-nowrap"
             >
               <Download className="h-3.5 w-3.5 text-ink-2" aria-hidden="true" />
-              <span>{t.ribbon.exportMenu}</span>
+              <span className="hidden sm:inline">{t.ribbon.exportMenu}</span>
               <ChevronDown
                 className={`h-3.5 w-3.5 text-ink-2 transition-transform duration-200 ${
                   exportOpen ? 'rotate-180' : ''

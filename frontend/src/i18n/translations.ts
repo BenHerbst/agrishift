@@ -140,8 +140,8 @@ export const PRESET_TEXT: Record<
 > = {
   en: {
     aachen: {
-      name: 'Rheinisches Revier / Aachen, Germany',
-      shortName: 'Aachen, DE',
+      name: 'Rheinisches Revier / Jülich Börde, Germany',
+      shortName: 'Jülich Börde, DE',
       climateZone: 'Temperate Loess Belt',
       summary:
         'Fertile loess soils seeing warmer summers and drier springs between March and August.',
@@ -170,8 +170,8 @@ export const PRESET_TEXT: Record<
   },
   de: {
     aachen: {
-      name: 'Rheinisches Revier / Aachen, Deutschland',
-      shortName: 'Aachen, DE',
+      name: 'Rheinisches Revier / Jülicher Börde, Deutschland',
+      shortName: 'Jülicher Börde, DE',
       climateZone: 'Gemäßigte Lössbörde',
       summary:
         'Tiefgründige Lössböden mit heißeren Sommern und häufigerem Wassermangel von Frühjahr bis Spätsommer.',
@@ -245,7 +245,12 @@ export const UI_STRINGS = {
       exportPdf: 'PDF Report',
     },
     onboarding: {
-      tagline: 'NASA POWER (1990–2025) · ISRIC SoilGrids (0–30 cm)',
+      tagline: 'NASA POWER · NASA GIBS · ISRIC SoilGrids',
+      facts: [
+        { title: 'Satellite imagery since 2000', text: 'MODIS vegetation index at 250 m, land surface temperature and SMAP soil moisture from NASA GIBS, following the timeline.' },
+        { title: '42 years of NASA weather data', text: 'Daily NASA POWER records since 1984 train a backtested forecast for the next 1–3 years.' },
+        { title: 'Soil and crop rotation', text: 'Soil profile from ISRIC SoilGrids and a crop recommendation per year, calculated from the forecast.' },
+      ],
       stepBadge: 'Step 1 · Select a location',
       title: 'Check local climate shifts and plan matching crop rotations',
       subtitle:
@@ -272,6 +277,7 @@ export const UI_STRINGS = {
       soilLive: 'ISRIC live',
       soilFallback: 'Soil estimate',
       noPlaceMatch: 'No matching place found.',
+      dataSources: 'Data sources',
     },
     saved: {
       menu: 'My fields',
@@ -314,6 +320,16 @@ export const UI_STRINGS = {
       recenter: 'Center on site',
       heatCursor: 'Cursor',
       heatSite: 'Site',
+      satTitle: 'Satellite',
+      sat: { ndvi: 'Vegetation', lst: 'Surface temp.', smap: 'Soil moisture' },
+      satLong: {
+        ndvi: 'Vegetation index (NDVI)',
+        lst: 'Land surface temperature, day',
+        smap: 'Root-zone soil moisture',
+      },
+      satLatest: 'Newest available image. There is no satellite imagery for future months.',
+      satNearest: 'No image on this date, showing the closest one.',
+      satBefore: 'This instrument has data from {date}. Move the timeline to a later date.',
     },
     soil: {
       kicker: 'ISRIC SoilGrids 250m · Topsoil 0–30 cm',
@@ -341,6 +357,8 @@ export const UI_STRINGS = {
       tabFieldShift: 'Soil & Rotation',
       tabSummary: 'Summary',
       tabForecast: 'Forecast & Risk',
+      fallbackPower: 'NASA POWER did not answer for this site, so the climate values are model estimates. Pick the site again to retry.',
+      fallbackSoil: 'SoilGrids has no soil data for this exact point (built-up area or water), so the soil values are regional estimates.',
       rotationHeading: '3-Year Crop Rotation Options',
     },
     trends: {
@@ -361,7 +379,7 @@ export const UI_STRINGS = {
       ensembleSkill: 'Backtest skill vs. 30-yr normal',
       ensembleSkillHint: 'Out-of-sample error reduction, 2020–2026 rolling backtest; > 0 beats the plain 1991–2020 average.',
       ensembleTrained: 'Trained until',
-      ensembleMapping: 'Backend ERA5 forecast mapped onto the NASA POWER series by the delta method (1991–2020 normals).',
+      ensembleMapping: 'Backend forecast mapped onto the monthly NASA POWER series by the delta method (1991–2020 normals).',
       timelineForecastLoading: 'Forecast loading…',
       ensembleNoCmip: 'Some climate-model projections (CMIP6) could not be read. The forecast uses the statistical members only and retries the models later.',
       ensembleEvlandNote: 'No backend forecast for actual ET (the backend forecasts reference ET0, which behaves differently in dry summers). Outlook = NASA POWER climatology of the last 15 years.',
@@ -443,7 +461,7 @@ export const UI_STRINGS = {
       inspectCalendar: 'Show 3-yr calendar',
     },
     forecast: {
-      kicker: 'Terra Tuta forecast backend · ERA5 + CMIP6 + ENSO/NAO/PDO ensemble',
+      kicker: 'Terra Tuta forecast ensemble',
       title: 'Seasonal Outlook 1–3 Years Ahead',
       subtitle:
         'Expected monthly conditions with an 80% range, not day-by-day weather. Every forecast is backtested against the plain 30-year average.',
@@ -452,9 +470,9 @@ export const UI_STRINGS = {
       monthsUnit: 'months',
       loadingTitle: 'Training forecast ensemble…',
       loadingHint:
-        'The first request for a new location downloads ~45 years of reanalysis and fits all models (1–2 minutes). Cached locations load instantly.',
+        'The first request for a new location downloads ~40 years of daily NASA POWER data and fits all models (about 30 seconds). Known locations load instantly.',
       errorTitle: 'Forecast backend unavailable',
-      errorHint: 'Start it with: cd backend && uvicorn app.main:app --reload',
+      errorHint: 'The measured NASA data above stays available. Try again in a moment.',
       retry: 'Retry',
       yearlyTitle: 'Year-by-Year Farming Indicators',
       yearlySubtitle: 'Forecast vs. the 1991–2020 normal for the same months',
@@ -540,7 +558,8 @@ export const UI_STRINGS = {
       errorFallback: 'Could not load the site summary.',
     },
     footer: {
-      left: '© 2026 Terra Tuta · Data: NASA POWER (1990–2025), NASA MODIS LST, ISRIC SoilGrids · Forecast: Copernicus ERA5-Land & CMIP6, NASA POWER, NOAA CPC · Air quality: CAMS · Places: OpenStreetMap (Photon, Nominatim)',
+      left: '© 2026 Terra Tuta · Data: NASA POWER, NASA GIBS (MODIS, SMAP), ISRIC SoilGrids, NOAA, OpenStreetMap',
+      sources: 'All data sources',
       right: "Mann-Kendall · Sen's Slope · SSP5-8.5",
       imprint: 'Imprint',
       privacy: 'Privacy Policy',
@@ -582,8 +601,13 @@ export const UI_STRINGS = {
       exportPdf: 'PDF-Bericht',
     },
     onboarding: {
-      tagline: 'NASA POWER (1990–2025) · ISRIC SoilGrids (0–30 cm)',
+      tagline: 'NASA POWER · NASA GIBS · ISRIC SoilGrids',
       stepBadge: 'Schritt 1 · Standort wählen',
+      facts: [
+        { title: 'Satellitenbilder seit 2000', text: 'MODIS-Vegetationsindex in 250 m, Oberflächentemperatur und SMAP-Bodenfeuchte über NASA GIBS, passend zum Zeitregler.' },
+        { title: '42 Jahre NASA-Wetterdaten', text: 'Tägliche NASA-POWER-Daten seit 1984 trainieren eine rückgetestete Prognose für die nächsten 1–3 Jahre.' },
+        { title: 'Boden und Fruchtfolge', text: 'Bodenprofil aus ISRIC SoilGrids und eine Fruchtfolge-Empfehlung pro Jahr, berechnet aus der Prognose.' },
+      ],
       title: 'Lokale Klimatrends prüfen und passende Fruchtfolgen planen',
       subtitle:
         'Geben Sie einen Ort, eine Region oder Ihren aktuellen Standort ein. Terra Tuta lädt 36 Jahre NASA-Wetterdaten sowie das lokale Bodenprofil und zeigt, wie sich Wärme und Bodenfeuchte verändern.',
@@ -609,6 +633,7 @@ export const UI_STRINGS = {
       soilLive: 'ISRIC live',
       soilFallback: 'Boden-Schätzmodell',
       noPlaceMatch: 'Kein passender Ort gefunden.',
+      dataSources: 'Datenquellen',
     },
     saved: {
       menu: 'Meine Felder',
@@ -651,6 +676,16 @@ export const UI_STRINGS = {
       recenter: 'Auf Standort zentrieren',
       heatCursor: 'Cursor',
       heatSite: 'Standort',
+      satTitle: 'Satellit',
+      sat: { ndvi: 'Vegetation', lst: 'Oberfl.-Temp.', smap: 'Bodenfeuchte' },
+      satLong: {
+        ndvi: 'Vegetationsindex (NDVI)',
+        lst: 'Landoberflächentemperatur, Tag',
+        smap: 'Bodenfeuchte im Wurzelraum',
+      },
+      satLatest: 'Neueste verfügbare Aufnahme. Für künftige Monate gibt es noch keine Satellitenbilder.',
+      satNearest: 'Für dieses Datum gibt es keine Aufnahme, gezeigt wird die nächstgelegene.',
+      satBefore: 'Dieses Instrument liefert Daten ab {date}. Zeitregler auf ein späteres Datum schieben.',
     },
     soil: {
       kicker: 'ISRIC SoilGrids 250 m · Oberboden 0–30 cm',
@@ -678,6 +713,8 @@ export const UI_STRINGS = {
       tabFieldShift: 'Boden & Fruchtfolge',
       tabSummary: 'Auswertung',
       tabForecast: 'Prognose & Risiko',
+      fallbackPower: 'NASA POWER hat für diesen Standort nicht geantwortet, die Klimawerte sind deshalb Modellschätzungen. Standort erneut wählen, um es noch einmal zu versuchen.',
+      fallbackSoil: 'SoilGrids hat für genau diesen Punkt keine Bodendaten (bebaute Fläche oder Wasser), die Bodenwerte sind deshalb regionale Schätzungen.',
       rotationHeading: '3-Jahres-Fruchtfolgen im Vergleich',
     },
     trends: {
@@ -698,7 +735,7 @@ export const UI_STRINGS = {
       ensembleSkill: 'Backtest-Skill vs. 30-J-Normal',
       ensembleSkillHint: 'Fehlerreduktion außerhalb der Stichprobe, rollierender Backtest 2020–2026; > 0 schlägt das 1991–2020-Mittel.',
       ensembleTrained: 'Trainiert bis',
-      ensembleMapping: 'ERA5-Prognose des Backends per Delta-Methode (Normalperiode 1991–2020) auf die NASA-POWER-Reihe übertragen.',
+      ensembleMapping: 'Backend-Prognose per Delta-Methode (Normalperiode 1991–2020) auf die monatliche NASA-POWER-Reihe übertragen.',
       timelineForecastLoading: 'Prognose lädt …',
       ensembleNoCmip: 'Einige Klimamodell-Projektionen (CMIP6) konnten nicht gelesen werden. Die Prognose nutzt nur die statistischen Modelle und versucht es später erneut.',
       ensembleEvlandNote: 'Keine Backend-Prognose für die tatsächliche Verdunstung (das Backend prognostiziert die Referenz-ET0, die sich in trockenen Sommern anders verhält). Ausblick = NASA-POWER-Klimatologie der letzten 15 Jahre.',
@@ -780,7 +817,7 @@ export const UI_STRINGS = {
       inspectCalendar: 'Im Kalender ansehen',
     },
     forecast: {
-      kicker: 'Terra-Tuta-Prognose-Backend · Ensemble aus ERA5, CMIP6 und ENSO/NAO/PDO',
+      kicker: 'Terra-Tuta-Prognose-Ensemble',
       title: 'Saisonaler Ausblick 1–3 Jahre voraus',
       subtitle:
         'Erwartete Monatswerte mit 80 %-Bereich, kein Tageswetter. Jede Prognose ist gegen das einfache 30-Jahres-Mittel getestet.',
@@ -789,9 +826,9 @@ export const UI_STRINGS = {
       monthsUnit: 'Monate',
       loadingTitle: 'Prognose-Ensemble wird trainiert …',
       loadingHint:
-        'Die erste Anfrage für einen neuen Ort lädt ~45 Jahre Reanalyse-Daten und trainiert alle Modelle (1–2 Minuten). Bekannte Orte laden sofort.',
+        'Die erste Anfrage für einen neuen Ort lädt ~40 Jahre NASA-POWER-Tagesdaten und trainiert alle Modelle (etwa 30 Sekunden). Bekannte Orte laden sofort.',
       errorTitle: 'Prognose-Backend nicht erreichbar',
-      errorHint: 'Starten mit: cd backend && uvicorn app.main:app --reload',
+      errorHint: 'Die gemessenen NASA-Daten bleiben verfügbar. In einem Moment erneut versuchen.',
       retry: 'Erneut versuchen',
       yearlyTitle: 'Landwirtschaftliche Kennzahlen pro Jahr',
       yearlySubtitle: 'Prognose gegenüber dem Normalwert 1991–2020 für dieselben Monate',
@@ -877,7 +914,8 @@ export const UI_STRINGS = {
       errorFallback: 'Die Auswertung konnte nicht geladen werden.',
     },
     footer: {
-      left: '© 2026 Terra Tuta · Daten: NASA POWER (1990–2025), NASA MODIS LST, ISRIC SoilGrids · Prognose: Copernicus ERA5-Land & CMIP6, NASA POWER, NOAA CPC · Luftqualität: CAMS · Orte: OpenStreetMap (Photon, Nominatim)',
+      left: '© 2026 Terra Tuta · Daten: NASA POWER, NASA GIBS (MODIS, SMAP), ISRIC SoilGrids, NOAA, OpenStreetMap',
+      sources: 'Alle Datenquellen',
       right: 'Mann-Kendall · Sen-Steigung · SSP5-8.5',
       imprint: 'Impressum',
       privacy: 'Datenschutz',

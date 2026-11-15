@@ -82,6 +82,7 @@ export function SavedFieldsMenu({ current, onLoad }: SavedFieldsMenuProps) {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
+        aria-label={t.saved.menu}
         className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs transition-colors duration-200 ease-out cursor-pointer whitespace-nowrap ${
           currentSaved
             ? 'border-crop/45 bg-crop/10 text-crop'
@@ -93,7 +94,7 @@ export function SavedFieldsMenu({ current, onLoad }: SavedFieldsMenuProps) {
         ) : (
           <Bookmark className="h-3.5 w-3.5 text-ink-2" aria-hidden="true" />
         )}
-        <span>{t.saved.menu}</span>
+        <span className="hidden sm:inline">{t.saved.menu}</span>
         {fields.length > 0 && (
           <span className="rounded-full bg-raised px-1.5 text-[10px] font-semibold tabular-nums text-ink-2">
             {fields.length}

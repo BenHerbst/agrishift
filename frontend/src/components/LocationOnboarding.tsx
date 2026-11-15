@@ -7,6 +7,9 @@ import {
   MapPin,
   Search,
   Trash2,
+  Satellite,
+  CloudSun,
+  Layers,
 } from 'lucide-react';
 import { PRESET_REGIONS } from '../data/presets';
 import { LanguageSwitcher, useI18n } from '../i18n/I18nContext';
@@ -46,8 +49,8 @@ export function LocationOnboarding({
   const [isLocating, setIsLocating] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
   const [showCoordEntry, setShowCoordEntry] = useState(false);
-  const [latInput, setLatInput] = useState('50.7753');
-  const [lonInput, setLonInput] = useState('6.0839');
+  const [latInput, setLatInput] = useState('50.8836');
+  const [lonInput, setLonInput] = useState('6.3053');
 
   const searchAbortRef = useRef<AbortController | null>(null);
 
@@ -321,6 +324,20 @@ export function LocationOnboarding({
                 </form>
               )}
             </div>
+
+            {/* What the site analysis is built from */}
+            <ul className="mt-8 grid gap-px overflow-hidden rounded-md border border-line bg-line sm:grid-cols-3">
+              {t.onboarding.facts.map((fact, i) => {
+                const Icon = [Satellite, CloudSun, Layers][i] ?? Layers;
+                return (
+                  <li key={fact.title} className="bg-panel p-4">
+                    <Icon className="h-4 w-4 text-crop" aria-hidden="true" />
+                    <p className="mt-2 text-sm font-semibold text-ink">{fact.title}</p>
+                    <p className="mt-1 text-xs leading-relaxed text-ink-2">{fact.text}</p>
+                  </li>
+                );
+              })}
+            </ul>
           </div>
 
           {/* Right 5 Columns: saved fields first, then example regions */}

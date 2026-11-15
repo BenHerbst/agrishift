@@ -52,7 +52,7 @@ function buildDeterministicBriefing(payload: AgroBriefingRequest): AgroBriefingR
   const gwet = statsByVariable.GWETROOT;
   const evland = statsByVariable.EVLAND;
 
-  const fmtP = (p: number) => (p < 0.001 ? '< 0.001' : p.toFixed(4));
+  const fmtP = (p: number) => (p < 0.001 ? 'p < 0.001' : `p = ${p.toFixed(4)}`);
   const decUnit = lang === 'de' ? 'Dekade' : 'decade';
   const fmtSlope = (v: number, unit: string) => `${v >= 0 ? '+' : ''}${v.toFixed(3)} ${unit}/${decUnit}`;
 
@@ -76,11 +76,11 @@ function buildDeterministicBriefing(payload: AgroBriefingRequest): AgroBriefingR
 
     return {
       headline: `Standort-Auswertung: ${regionName}`,
-      executiveSummary: `Auf Basis der NASA-POWER-Klimadaten (1990–2025, ${windowLabelDe}) bei ${lat.toFixed(3)}°, ${lon.toFixed(3)}° und dem ISRIC-Bodenprofil 0–30 cm (${soil.textureClass}, pH ${soil.ph}, ${soil.socPercent}% C_org) zeigt der Standort ${t2m.isSignificant ? 'einen klaren Erwärmungstrend' : 'starke jährliche Temperaturschwankungen'} (${fmtSlope(t2m.sensSlopePerDecade, '°C')}, p = ${fmtP(t2m.pValue)}) bei einer Bodenfeuchte-Änderung von ${fmtSlope(gwet.sensSlopePerDecade, 'Anteil')} (p = ${fmtP(gwet.pValue)}). Mit Schwerpunkt auf ${prioDe} passt die Fruchtfolge „${recommendedScenario.title}“ (${recommendedScenario.cropsSummary}).`,
+      executiveSummary: `Auf Basis der NASA-POWER-Klimadaten (1990–2025, ${windowLabelDe}) bei ${lat.toFixed(3)}°, ${lon.toFixed(3)}° und dem ISRIC-Bodenprofil 0–30 cm (${soil.textureClass}, pH ${soil.ph}, ${soil.socPercent}% C_org) zeigt der Standort ${t2m.isSignificant ? 'einen klaren Erwärmungstrend' : 'starke jährliche Temperaturschwankungen'} (${fmtSlope(t2m.sensSlopePerDecade, '°C')}, ${fmtP(t2m.pValue)}) bei einer Bodenfeuchte-Änderung von ${fmtSlope(gwet.sensSlopePerDecade, 'Anteil')} (${fmtP(gwet.pValue)}). Mit Schwerpunkt auf ${prioDe} passt die Fruchtfolge „${recommendedScenario.title}“ (${recommendedScenario.cropsSummary}).`,
       climateSignalFindings: [
-        `Temperatur (2m): Änderungsrate ${fmtSlope(t2m.sensSlopePerDecade, '°C')}, Mann-Kendall Z = ${t2m.mannKendallZ.toFixed(2)}, p = ${fmtP(t2m.pValue)}.`,
-        `Wurzelraum-Bodenfeuchte: Änderungsrate ${fmtSlope(gwet.sensSlopePerDecade, 'Anteil')}, Z = ${gwet.mannKendallZ.toFixed(2)}, p = ${fmtP(gwet.pValue)}.`,
-        `Niederschlag & Verdunstung: Niederschlag ${fmtSlope(precip.sensSlopePerDecade, 'mm/Tag')} (p = ${fmtP(precip.pValue)}) gegenüber Verdunstung ${fmtSlope(evland.sensSlopePerDecade, 'mm/Tag')} (p = ${fmtP(evland.pValue)}).`,
+        `Temperatur (2m): Änderungsrate ${fmtSlope(t2m.sensSlopePerDecade, '°C')}, Mann-Kendall Z = ${t2m.mannKendallZ.toFixed(2)}, ${fmtP(t2m.pValue)}.`,
+        `Wurzelraum-Bodenfeuchte: Änderungsrate ${fmtSlope(gwet.sensSlopePerDecade, 'Anteil')}, Z = ${gwet.mannKendallZ.toFixed(2)}, ${fmtP(gwet.pValue)}.`,
+        `Niederschlag & Verdunstung: Niederschlag ${fmtSlope(precip.sensSlopePerDecade, 'mm/Tag')} (${fmtP(precip.pValue)}) gegenüber Verdunstung ${fmtSlope(evland.sensSlopePerDecade, 'mm/Tag')} (${fmtP(evland.pValue)}).`,
         `Oberboden (0–30 cm): ${soil.textureClass} (${soil.clayPercent}% Ton, ${soil.sandPercent}% Sand), pH ${soil.ph}, organischer Kohlenstoff ${soil.socPercent}%.`,
       ],
       recommendedActionPlan: [
@@ -107,11 +107,11 @@ function buildDeterministicBriefing(payload: AgroBriefingRequest): AgroBriefingR
 
   return {
     headline: `Site Summary: ${regionName}`,
-    executiveSummary: `Based on 1990–2025 NASA POWER weather records (${windowLabel}) at ${lat.toFixed(3)}°, ${lon.toFixed(3)}° and ISRIC SoilGrids 0–30 cm properties (${soil.textureClass}, pH ${soil.ph}, ${soil.socPercent}% SOC), the site shows ${t2m.isSignificant ? 'a clear warming trend' : 'year-to-year temperature swings'} (${fmtSlope(t2m.sensSlopePerDecade, '°C')}, p = ${fmtP(t2m.pValue)}) alongside a root-zone moisture rate of ${fmtSlope(gwet.sensSlopePerDecade, 'frac')} (p = ${fmtP(gwet.pValue)}). With priority on ${topPriority}, "${recommendedScenario.title}" (${recommendedScenario.cropsSummary}) fits well.`,
+    executiveSummary: `Based on 1990–2025 NASA POWER weather records (${windowLabel}) at ${lat.toFixed(3)}°, ${lon.toFixed(3)}° and ISRIC SoilGrids 0–30 cm properties (${soil.textureClass}, pH ${soil.ph}, ${soil.socPercent}% SOC), the site shows ${t2m.isSignificant ? 'a clear warming trend' : 'year-to-year temperature swings'} (${fmtSlope(t2m.sensSlopePerDecade, '°C')}, ${fmtP(t2m.pValue)}) alongside a root-zone moisture rate of ${fmtSlope(gwet.sensSlopePerDecade, 'fraction')} (${fmtP(gwet.pValue)}). With priority on ${topPriority}, "${recommendedScenario.title}" (${recommendedScenario.cropsSummary}) fits well.`,
     climateSignalFindings: [
-      `Temperature (2m): Sen's Slope ${fmtSlope(t2m.sensSlopePerDecade, '°C')}, Mann-Kendall Z = ${t2m.mannKendallZ.toFixed(2)}, p = ${fmtP(t2m.pValue)}.`,
-      `Root-Zone Moisture: Sen's Slope ${fmtSlope(gwet.sensSlopePerDecade, 'frac')}, Z = ${gwet.mannKendallZ.toFixed(2)}, p = ${fmtP(gwet.pValue)}.`,
-      `Rainfall & Evaporation: Precipitation ${fmtSlope(precip.sensSlopePerDecade, 'mm/day')} (p = ${fmtP(precip.pValue)}) vs. ET ${fmtSlope(evland.sensSlopePerDecade, 'mm/day')} (p = ${fmtP(evland.pValue)}).`,
+      `Temperature (2m): Sen's Slope ${fmtSlope(t2m.sensSlopePerDecade, '°C')}, Mann-Kendall Z = ${t2m.mannKendallZ.toFixed(2)}, ${fmtP(t2m.pValue)}.`,
+      `Root-Zone Moisture: Sen's Slope ${fmtSlope(gwet.sensSlopePerDecade, 'fraction')}, Z = ${gwet.mannKendallZ.toFixed(2)}, ${fmtP(gwet.pValue)}.`,
+      `Rainfall & Evaporation: Precipitation ${fmtSlope(precip.sensSlopePerDecade, 'mm/day')} (${fmtP(precip.pValue)}) vs. ET ${fmtSlope(evland.sensSlopePerDecade, 'mm/day')} (${fmtP(evland.pValue)}).`,
       `Topsoil (0–30 cm): ${soil.textureClass} (${soil.clayPercent}% clay, ${soil.sandPercent}% sand), pH ${soil.ph}, Soil Organic Carbon ${soil.socPercent}%.`,
     ],
     recommendedActionPlan: [

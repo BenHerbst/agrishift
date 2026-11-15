@@ -39,11 +39,29 @@ port 3000.
 > once it arrives. Repeat visits to the same location are instant. For the best data (ERA5-Land, CMIP6
 > projections, CAMS air quality) run `backend/scripts/download_copernicus.py` for the location once.
 
+## Before a demo
+
+With frontend and backend running, warm every cache the example regions use (NASA POWER point and
+regional grids, SoilGrids, forecast training, soil, crop rotation, OpenStreetMap pollution check):
+
+```bash
+cd frontend
+npm run warm                     # all example regions, ~4 min the first time, seconds afterwards
+npm run warm -- 50.88,6.31       # add your own sites as lat,lon
+```
+
+Fields saved under **My fields** reopen with the same requests, so a saved and warmed field also loads
+instantly. Drawing a brand-new field during a demo waits on SoilGrids (5–20 s) and trains a forecast for its
+centre (~30 s); the app stays usable meanwhile.
+
 ## How the data fits together
 
 | Where in the app | Data | Source |
 |---|---|---|
 | Trend chart, timeline, KPI chips (1990–2025) | Monthly T2M, precipitation, root-zone moisture, ET | NASA POWER |
+| Map climate layers | Monthly T2M, precipitation, root-zone moisture on the MERRA-2 grid | NASA POWER regional |
+| Map satellite layers (follow the timeline) | MODIS NDVI 250 m, MODIS land surface temperature, SMAP root-zone soil moisture | NASA GIBS |
+| **Data sources** panel | Every request made for the site, with status and a link to the raw API call | — |
 | Soil card, rotation scoring | pH, organic carbon, texture (0–30 cm) | ISRIC SoilGrids |
 | Trend chart & timeline, **Ensemble Forecast** mode | Monthly forecast with 80 % range, 1–3 years | Backend `/forecast`, `/history` |
 | **Forecast & Risk** tab | Yearly farming indicators vs. 1991–2020 normal | Backend `/agri-summary` |

@@ -14,7 +14,12 @@ import type {
   SoilProfile,
 } from '../types/terrashift';
 
-const TIMEOUT_MS = 4000;
+// NASA POWER answers in about a second; SoilGrids takes 4–12 s for a point it has not served recently.
+// Both go through the server's disk cache, so only the first visit of a site waits this long.
+const POWER_TIMEOUT_MS = 15000;
+const SOIL_TIMEOUT_MS = 25000;
+// SoilGrids depth intervals for the topsoil, weighted by thickness (cm)
+const TOPSOIL_DEPTHS: Array<[string, number]> = [['0-5cm', 5], ['5-15cm', 10], ['15-30cm', 15]];
 
 interface NasaPowerResponse {
   properties?: {
@@ -89,6 +94,11 @@ function findRegionLabel(lat: number, lon: number): string {
   return `Custom Site (${Math.abs(lat).toFixed(3)}°${latHem}, ${Math.abs(lon).toFixed(3)}°${lonHem})`;
 }
 
+/** NASA POWER monthly point request: 4 agro-climate parameters, 1990–2025, Agroclimatology community. */
+export function nasaPowerMonthlyUrl(lat: number, lon: number): string {
+  return `https://power.larc.nasa.gov/api/temporal/monthly/point?parameters=T2M,PRECTOTCORR,GWETROOT,EVLAND&community=AG&longitude=${lon.toFixed(4)}&latitude=${lat.toFixed(4)}&start=1990&end=2025&format=JSON`;
+}
+
 async function fetchNasaPower(
   lat: number,
   lon: number,
@@ -100,10 +110,10 @@ async function fetchNasaPower(
   latencyMs: number;
 }> {
   const start = performance.now();
-  const url = `https://power.larc.nasa.gov/api/temporal/monthly/point?parameters=T2M,PRECTOTCORR,GWETROOT,EVLAND&community=AG&longitude=${lon.toFixed(4)}&latitude=${lat.toFixed(4)}&start=1990&end=2025&format=JSON`;
+  const url = nasaPowerMonthlyUrl(lat, lon);
 
   try {
-    const res = await fetchWithTimeout(cached(url), TIMEOUT_MS, signal);
+    const res = await fetchWithTimeout(cached(url), POWER_TIMEOUT_MS, signal);
     const latencyMs = Math.round(performance.now() - start);
     if (!res.ok) {
       return { recordsByVariable: fallbackRecords, source: 'fallback', latencyMs };
@@ -157,6 +167,47 @@ async function fetchNasaPower(
   }
 }
 
+/** ISRIC SoilGrids point request: pH, organic carbon, clay and sand for the three topsoil intervals. */
+export function soilGridsUrl(lat: number, lon: number): string {
+  const depthQuery = TOPSOIL_DEPTHS.map(([label]) => `depth=${label}`).join('&');
+  return `https://rest.isric.org/soilgrids/v2.0/properties/query?lon=${lon.toFixed(4)}&lat=${lat.toFixed(4)}&property=phh2o&property=soc&property=clay&property=sand&${depthQuery}&value=mean`;
+}
+
+interface BackendSoilResponse {
+  profile?: {
+    topsoil_0_30cm?: { 'sand_%'?: number; 'clay_%'?: number; 'organic_matter_%'?: number; ph?: number };
+  };
+}
+
+/** Backend /soil: SoilGrids median of the soil pixels within ~1 km. null if unavailable. */
+async function soilFromBackend(lat: number, lon: number, start: number, signal?: AbortSignal): Promise<SoilProfile | null> {
+  try {
+    const res = await fetchWithTimeout(
+      `${(import.meta.env?.VITE_CLIMATE_API_BASE as string | undefined)?.replace(/\/+$/, '') ?? '/api/climate'}/soil?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}`,
+      SOIL_TIMEOUT_MS * 2,
+      signal
+    );
+    if (!res.ok) return null;
+    const top = ((await res.json()) as BackendSoilResponse).profile?.topsoil_0_30cm;
+    if (!top || top.ph == null || top['clay_%'] == null || top['sand_%'] == null || top['organic_matter_%'] == null) return null;
+    const clayPercent = Math.round(top['clay_%']);
+    const sandPercent = Math.round(top['sand_%']);
+    const siltPercent = Math.max(0, 100 - clayPercent - sandPercent);
+    return {
+      ph: Number(top.ph.toFixed(1)),
+      socPercent: Number((top['organic_matter_%'] / 1.724).toFixed(2)), // van Bemmelen factor
+      clayPercent,
+      sandPercent,
+      siltPercent,
+      textureClass: classifySoilTexture(clayPercent, sandPercent, siltPercent),
+      source: 'live',
+      latencyMs: Math.round(performance.now() - start),
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function fetchSoilGrids(
   lat: number,
   lon: number,
@@ -164,22 +215,31 @@ async function fetchSoilGrids(
   signal?: AbortSignal
 ): Promise<SoilProfile> {
   const start = performance.now();
-  const url = `https://rest.isric.org/soilgrids/v2.0/properties/query?lon=${lon.toFixed(4)}&lat=${lat.toFixed(4)}&property=phh2o&property=soc&property=clay&property=sand&depth=0-30cm&value=mean`;
+  const url = soilGridsUrl(lat, lon);
 
   try {
-    const res = await fetchWithTimeout(cached(url), TIMEOUT_MS, signal);
+    const res = await fetchWithTimeout(cached(url), SOIL_TIMEOUT_MS, signal);
     const latencyMs = Math.round(performance.now() - start);
     if (!res.ok) {
-      return { ...fallbackSoil, source: 'fallback', latencyMs };
+      return (await soilFromBackend(lat, lon, start, signal)) ?? { ...fallbackSoil, source: 'fallback', latencyMs };
     }
 
     const json = (await res.json()) as SoilGridsResponse;
     const layers = json?.properties?.layers ?? [];
 
+    // Thickness-weighted 0–30 cm mean over the depth intervals that have data
     const readLayerMean = (name: string): number | null => {
       const layer = layers.find((l) => l.name === name);
-      const val = layer?.depths?.[0]?.values?.mean;
-      return typeof val === 'number' && Number.isFinite(val) ? val : null;
+      let sum = 0;
+      let weight = 0;
+      for (const [label, cm] of TOPSOIL_DEPTHS) {
+        const val = layer?.depths?.find((d) => d.label === label)?.values?.mean;
+        if (typeof val === 'number' && Number.isFinite(val)) {
+          sum += val * cm;
+          weight += cm;
+        }
+      }
+      return weight > 0 ? sum / weight : null;
     };
 
     const rawPh = readLayerMean('phh2o');
@@ -188,7 +248,8 @@ async function fetchSoilGrids(
     const rawSand = readLayerMean('sand');
 
     if (rawPh === null || rawSoc === null || rawClay === null || rawSand === null) {
-      return { ...fallbackSoil, source: 'fallback', latencyMs };
+      // Built-up or water pixel: SoilGrids masks it, the backend takes the median of soil pixels nearby
+      return (await soilFromBackend(lat, lon, start, signal)) ?? { ...fallbackSoil, source: 'fallback', latencyMs };
     }
 
     // SoilGrids v2.0 standard unit conversions:
@@ -296,6 +357,7 @@ export async function fetchEarthSystemData(
     lon,
     regionName: customRegionLabel || findRegionLabel(lat, lon),
     powerSource: powerResult.source,
+    powerPoints: [{ lat, lon }],
     powerLatencyMs: powerResult.latencyMs,
     recordsByVariable: powerResult.recordsByVariable,
     climatology,
@@ -331,8 +393,10 @@ export async function fetchFieldAverageEarthSystemData(
         return fetchNasaPower(pt.lat, pt.lon, fb.recordsByVariable, signal);
       })
     ),
+    // shortcut: soil from the field centre only. SoilGrids allows ~5 requests a minute and a field of a
+    // few dozen hectares spans 2–3 of its 250 m pixels; sample more points for very large fields.
     Promise.all(
-      samplePoints.map((pt) => {
+      [{ lat: field.centroidLat, lon: field.centroidLon }].map((pt) => {
         const fb = generateFallbackSeries(pt.lat, pt.lon);
         return fetchSoilGrids(pt.lat, pt.lon, fb.soil, signal);
       })
@@ -357,6 +421,7 @@ export async function fetchFieldAverageEarthSystemData(
     lon: field.centroidLon,
     regionName: `Drawn Field (${areaLabel})`,
     powerSource: livePower.length > 0 ? 'live' : 'fallback',
+    powerPoints: uniquePowerPoints,
     powerLatencyMs: avgPowerLatency,
     recordsByVariable: averagedRecords,
     climatology,

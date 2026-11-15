@@ -64,6 +64,8 @@ interface RawForecastResponse {
   horizon_months: number;
   sources?: {
     history?: string | null;
+    history_source?: string | null;
+    history_period?: string | null;
     prophet_member?: boolean;
     seasonal_forecast?: string | null;
     station_calibration?: string[] | null;
@@ -271,6 +273,8 @@ function normalizeRisk(raw: RawRiskResponse): SeasonRisk[] {
 function normalizeSources(raw: RawForecastResponse['sources']): ForecastSources {
   return {
     history: raw?.history ?? null,
+    historySource: raw?.history_source ?? null,
+    historyPeriod: raw?.history_period ?? null,
     prophetMember: Boolean(raw?.prophet_member),
     seasonalForecast: raw?.seasonal_forecast ?? null,
     stationCalibration: raw?.station_calibration ?? null,
@@ -323,4 +327,28 @@ export async function fetchClimateForecast(
     fetchedAtIso: new Date().toISOString(),
     latencyMs: Math.round(performance.now() - start),
   };
+}
+
+// ---------------------------------------------------------------------------
+// GET /rotation: one crop per forecast year from the backend's crop scoring.
+// ---------------------------------------------------------------------------
+
+export interface RotationYear {
+  year: number;
+  crop: string | null;
+  family: string | null;
+  score: number | null;
+  reasons: string[];
+  alternatives: Array<{ crop: string; score: number }>;
+}
+
+export interface RotationPlan {
+  plan: RotationYear[];
+  soil: { texture_class?: string; ph?: number; total_available_water_mm?: number; error?: string };
+  /** crop group → 'safe' | 'caution' | 'avoid' (nearby roads, industry, air quality) */
+  pollution: Record<string, string> | { error: string } | null;
+}
+
+export function fetchRotationPlan(lat: number, lon: number, signal?: AbortSignal): Promise<RotationPlan> {
+  return getJson<RotationPlan>('/rotation', { lat, lon, years: 3 }, signal);
 }

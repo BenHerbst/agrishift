@@ -61,6 +61,9 @@ const MONTHLY_VARIABLES: BackendVariable[] = [
   'wet_days',
 ];
 
+const UNIT_DE: Record<string, string> = { '°C·day': '°C·Tag', days: 'Tage' };
+const unitText = (unit: string, lang: 'de' | 'en') => (lang === 'de' ? UNIT_DE[unit] ?? unit : unit);
+
 function fmt(value: number, unit: string): string {
   const digits = unit === 'm³/m³' ? 3 : Math.abs(value) >= 100 ? 0 : 1;
   return value.toFixed(digits);
@@ -126,7 +129,7 @@ export function ForecastRiskPanel({ forecast, status, error, onRetry, lang, t }:
           <div className="space-y-1.5 min-w-0">
             <div className="text-sm font-semibold text-warn">{ft.errorTitle}</div>
             {error && <p className="text-xs text-warn break-words">{error}</p>}
-            <p className="font-mono text-[11px] text-ink-2">{ft.errorHint}</p>
+            <p className="text-xs text-ink-2">{ft.errorHint}</p>
             <button
               type="button"
               onClick={onRetry}
@@ -151,7 +154,16 @@ export function ForecastRiskPanel({ forecast, status, error, onRetry, lang, t }:
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line pb-3">
         <div className="min-w-0">
-          <p className="text-[11px] text-ink-3">{ft.kicker}</p>
+          <p className="text-[11px] text-ink-3">
+            {[
+              ft.kicker,
+              src.history ? `${src.history}${src.historyPeriod ? ` (${src.historyPeriod})` : ''}` : null,
+              src.climateProjections?.length ? 'CMIP6' : null,
+              src.climateIndices ? 'ENSO/NAO/PDO' : null,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </p>
           <h3 className="mt-0.5 text-sm font-semibold text-ink">{ft.title}</h3>
           <p className="mt-0.5 text-xs text-ink-2">{ft.subtitle}</p>
         </div>
@@ -191,7 +203,8 @@ export function ForecastRiskPanel({ forecast, status, error, onRetry, lang, t }:
                     {y.year}
                     {!y.completeYear && (
                       <div className="font-sans text-[10px] font-normal text-ink-3">
-                        {ft.incompleteYear} · {y.monthsCovered}
+                        {ft.incompleteYear} ·{' '}
+                        {y.monthsCovered.replace(/\d{4}-(\d{2})\s*–\s*\d{4}-(\d{2})/, (_, a, b) => `${monthNames[Number(a) - 1]}–${monthNames[Number(b) - 1]}`)}
                       </div>
                     )}
                   </th>
@@ -217,7 +230,7 @@ export function ForecastRiskPanel({ forecast, status, error, onRetry, lang, t }:
                     return (
                       <td key={y.year} className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap">
                         <div className="text-ink">
-                          {fmt(ind.forecast, ind.unit)} <span className="text-[10px] text-ink-3">{ind.unit}</span>
+                          {fmt(ind.forecast, ind.unit)} <span className="text-[10px] text-ink-3">{unitText(ind.unit, lang)}</span>
                         </div>
                         <div className={`text-[10px] ${stress ? 'text-warn' : 'text-ink-3'}`}>
                           {signed(ind.anomaly, ind.unit)} vs. {ft.normalShort}
@@ -339,7 +352,7 @@ export function ForecastRiskPanel({ forecast, status, error, onRetry, lang, t }:
               {ft.monthlyTitle} · {ft.indicators[monthlyVar]}
             </h4>
             <p className="text-[11px] text-ink-3">
-              {ft.monthlySubtitle} ({monthlyUnit}) ·{' '}
+              {ft.monthlySubtitle} ({unitText(monthlyUnit, lang)}) ·{' '}
               <span title={ft.skillHint}>
                 {ft.skillLabel}:{' '}
                 <span
@@ -405,7 +418,7 @@ export function ForecastRiskPanel({ forecast, status, error, onRetry, lang, t }:
                       <div className="flex justify-between gap-4 text-crop">
                         <span>{ft.legendForecast}</span>
                         <span>
-                          {fmt(pt.forecast, monthlyUnit)} {monthlyUnit}
+                          {fmt(pt.forecast, monthlyUnit)} {unitText(monthlyUnit, lang)}
                         </span>
                       </div>
                       <div className="flex justify-between gap-4 text-ink-2">

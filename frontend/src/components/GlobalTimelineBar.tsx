@@ -1,7 +1,7 @@
 import { Calendar, Pause, Play, RefreshCw, RotateCcw } from 'lucide-react';
 import { useI18n } from '../i18n/I18nContext';
 import { MONTH_SHORT_BY_LANG, VARIABLE_TEXT } from '../i18n/translations';
-import { DISPLAY_START_YEAR, VARIABLE_META, type MonthlyTimelineSnapshot } from '../utils/statistics';
+import { DISPLAY_START_YEAR, unitLabel, type MonthlyTimelineSnapshot } from '../utils/statistics';
 import type { ClimateVariable, ForecastMode } from '../types/terrashift';
 
 export type TimelineStepIncrement = 1 | 3 | 12;
@@ -196,7 +196,6 @@ export function GlobalTimelineBar({
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-px border border-line bg-line">
           {VARIABLES.map((variable) => {
             const active = selectedVariable === variable;
-            const meta = VARIABLE_META[variable];
             const decimals = variable === 'GWETROOT' ? 3 : 2;
             const valEntry = activeMonthValues?.[variable];
             const anom = valEntry?.anomaly ?? 0;
@@ -236,7 +235,7 @@ export function GlobalTimelineBar({
                 <div className="mt-0.5 font-mono text-xs font-semibold tabular-nums text-ink">
                   {isLoading || !valEntry
                     ? '—'
-                    : `${valEntry.value.toFixed(decimals)} ${meta.unit}`}
+                    : `${valEntry.value.toFixed(decimals)} ${unitLabel(variable, lang)}`}
                 </div>
               </button>
             );

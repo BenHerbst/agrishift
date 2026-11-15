@@ -195,7 +195,7 @@ export function LegalPage({ route, onNavigate }: LegalPageProps) {
                         <strong className="text-ink">Mapbox:</strong> Darstellung der interaktiven Vektor- und Satellitenkarten sowie Standort-Hervorhebungen.
                       </li>
                       <li>
-                        <strong className="text-ink">NASA POWER &amp; NASA GIBS:</strong> Abruf historischer Klimadaten (1990–2025) und MODIS-Oberflächentemperatur-Ebenen.
+                        <strong className="text-ink">NASA POWER &amp; NASA GIBS:</strong> Abruf historischer Klimadaten (monatlich 1990–2025, täglich ab 1984) sowie Satellitenkacheln für MODIS-Vegetationsindex, MODIS-Oberflächentemperatur und SMAP-Bodenfeuchte.
                       </li>
                       <li>
                         <strong className="text-ink">ISRIC SoilGrids:</strong> Abruf lokaler Oberboden-Kennwerte (0–30 cm).
@@ -245,7 +245,7 @@ export function LegalPage({ route, onNavigate }: LegalPageProps) {
                         <strong className="text-ink">Mapbox:</strong> Vector/satellite map rendering and spatial site highlighting.
                       </li>
                       <li>
-                        <strong className="text-ink">NASA POWER &amp; NASA GIBS:</strong> Historical 1990–2025 climate records and MODIS surface temperature tiles.
+                        <strong className="text-ink">NASA POWER &amp; NASA GIBS:</strong> Historical climate records (monthly 1990–2025, daily since 1984) and satellite tiles for MODIS vegetation index, MODIS land surface temperature and SMAP soil moisture.
                       </li>
                       <li>
                         <strong className="text-ink">ISRIC SoilGrids:</strong> Topsoil properties (0–30 cm).

@@ -34,11 +34,14 @@ import {
 } from '../i18n/translations';
 import { BASELINE_CROP_OPTIONS } from '../utils/rotationEngine';
 import { ForecastRiskPanel } from './ForecastRiskPanel';
+import { ForecastRotationCard } from './ForecastRotationCard';
+import type { RotationPlan } from '../services/climateForecastService';
 import {
   DISPLAY_START_YEAR,
   VARIABLE_META,
   generateDetectiveExplainer,
   localizeTrendClassification,
+  unitLabel,
 } from '../utils/statistics';
 import type {
   AgroBriefingResponse,
@@ -94,6 +97,8 @@ interface RightDataPanelProps {
   isBriefingLoading: boolean;
   briefingError: string | null;
   onRegenerateBriefing: () => void;
+  rotationPlan: RotationPlan | null;
+  rotationStatus: 'idle' | 'loading' | 'ready' | 'error';
 }
 
 const VARIABLES: ClimateVariable[] = ['T2M', 'PRECTOTCORR', 'GWETROOT', 'EVLAND'];
@@ -130,6 +135,8 @@ export function RightDataPanel({
   isBriefingLoading,
   briefingError,
   onRegenerateBriefing,
+  rotationPlan,
+  rotationStatus,
 }: RightDataPanelProps) {
   const { lang, t } = useI18n();
   const meta = VARIABLE_META[selectedVariable];
@@ -234,6 +241,12 @@ export function RightDataPanel({
 
       {/* Tab Content */}
       <div className="flex-1 p-4 sm:p-5 flex flex-col gap-5 min-w-0 lg:min-h-0 lg:overflow-y-auto">
+        {dataset && !isLoading && (dataset.powerSource === 'fallback' || dataset.soil.source === 'fallback') && (
+          <p role="status" className="flex items-start gap-2 rounded-md border border-warn/40 bg-warn/10 px-3 py-2 text-xs leading-relaxed text-warn">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            {dataset.powerSource === 'fallback' ? t.rightPanel.fallbackPower : t.rightPanel.fallbackSoil}
+          </p>
+        )}
         {!isLoading && dataset?.fieldAreaStats && (
           <div className="flex flex-wrap items-center justify-between gap-2 border border-crop/35 bg-crop/10 px-3.5 py-2 text-xs">
             <div className="flex items-center gap-2 text-crop font-medium">
@@ -245,7 +258,7 @@ export function RightDataPanel({
             </div>
             <div className="font-mono text-[11px] tabular-nums text-ink">
               {lang === 'de'
-                ? `${dataset.fieldAreaStats.samplePointsCount} Messpunkte gemittelt · Umfang ${dataset.fieldAreaStats.perimeterMeters} m`
+                ? `${dataset.fieldAreaStats.samplePointsCount} ${dataset.fieldAreaStats.samplePointsCount === 1 ? 'Messpunkt' : 'Messpunkte'} gemittelt · Umfang ${dataset.fieldAreaStats.perimeterMeters} m`
                 : `${dataset.fieldAreaStats.samplePointsCount} sample points averaged · perimeter ${dataset.fieldAreaStats.perimeterMeters} m`}
             </div>
           </div>
@@ -268,7 +281,7 @@ export function RightDataPanel({
             stats={stats}
             thresholdFinding={thresholdFinding}
             decimals={decimals}
-            unit={meta.unit}
+            unit={unitLabel(selectedVariable, lang)}
             varLabel={varText.label}
             lineAccent={lineAccent}
             isNegativeWarning={isNegativeWarning}
@@ -313,6 +326,8 @@ export function RightDataPanel({
             }}
             selectedMonthCell={selectedMonthCell}
             onSelectMonthCell={setSelectedMonthCell}
+            rotationPlan={rotationPlan}
+            rotationStatus={rotationStatus}
           />
         ) : (
           <SummaryTabView
@@ -1089,6 +1104,8 @@ function FieldShiftTabView({
   onSelectScenario,
   selectedMonthCell,
   onSelectMonthCell,
+  rotationPlan,
+  rotationStatus,
 }: {
   dataset: EarthSystemDataset;
   monthNames: string[];
@@ -1105,6 +1122,8 @@ function FieldShiftTabView({
   onSelectScenario: (id: RotationScenario['id']) => void;
   selectedMonthCell: { yearLabel: string; cell: CropCalendarMonthCell } | null;
   onSelectMonthCell: (item: { yearLabel: string; cell: CropCalendarMonthCell } | null) => void;
+  rotationPlan: RotationPlan | null;
+  rotationStatus: 'idle' | 'loading' | 'ready' | 'error';
 }) {
   const priorityItems: Array<{ key: keyof FarmerPriorities; label: string }> = [
     { key: 'water', label: t.fieldShift.priorities.water },
@@ -1208,6 +1227,8 @@ function FieldShiftTabView({
           </div>
         </div>
       </div>
+
+      <ForecastRotationCard plan={rotationPlan} status={rotationStatus} lang={lang} />
 
       {/* Baseline Crop & Farm Priorities */}
       <div className="border border-line bg-ground p-4 space-y-4">

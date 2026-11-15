@@ -62,6 +62,13 @@ export function formatTimelinePeriod(period: TimelinePeriod, monthNames: string[
     : `${mn(start.month)} ${start.year} – ${mn(end.month)} ${end.year}`;
 }
 
+/** Display unit per language (VARIABLE_META.unit stays the English code used in exports). */
+const UNIT_TEXT: Record<'de' | 'en', Record<ClimateVariable, string>> = {
+  en: { T2M: '°C', PRECTOTCORR: 'mm/day', GWETROOT: 'fraction', EVLAND: 'mm/day' },
+  de: { T2M: '°C', PRECTOTCORR: 'mm/Tag', GWETROOT: 'Anteil', EVLAND: 'mm/Tag' },
+};
+export const unitLabel = (variable: ClimateVariable, lang: 'de' | 'en') => UNIT_TEXT[lang][variable];
+
 export const VARIABLE_META: Record<ClimateVariable, VariableMetadata> = {
   T2M: {
     code: 'T2M',
@@ -613,7 +620,6 @@ export function evaluateAgronomicThreshold(
 
   if (mode === 'ensemble' && projPoints.length === 0) {
     const decimals = stats.variable === 'GWETROOT' ? 3 : 2;
-    const unit = VARIABLE_META[stats.variable].unit;
     return {
       crossed: false,
       alreadyExceeded: false,
@@ -623,14 +629,13 @@ export function evaluateAgronomicThreshold(
       projected2035: lastHist?.value ?? stats.recentMean,
       ci2035Lower: lastHist?.value ?? stats.recentMean,
       ci2035Upper: lastHist?.value ?? stats.recentMean,
-      messageEn: `Ensemble forecast not available for this window yet. Latest mean: ${stats.recentMean.toFixed(decimals)} ${unit}.`,
-      messageDe: `Für dieses Zeitfenster liegt noch keine Ensemble-Prognose vor. Aktuelles Mittel: ${stats.recentMean.toFixed(decimals)} ${unit}.`,
+      messageEn: `Ensemble forecast not available for this window yet. Latest mean: ${stats.recentMean.toFixed(decimals)} ${unitLabel(stats.variable, 'en')}.`,
+      messageDe: `Für dieses Zeitfenster liegt noch keine Ensemble-Prognose vor. Aktuelles Mittel: ${stats.recentMean.toFixed(decimals)} ${unitLabel(stats.variable, 'de')}.`,
     };
   }
 
   if (mode === 'historical') {
     const decimals = stats.variable === 'GWETROOT' ? 3 : 2;
-    const unit = VARIABLE_META[stats.variable].unit;
     return {
       crossed: false,
       alreadyExceeded: false,
@@ -640,8 +645,8 @@ export function evaluateAgronomicThreshold(
       projected2035: lastHist?.value ?? stats.recentMean,
       ci2035Lower: lastHist?.value ?? stats.recentMean,
       ci2035Upper: lastHist?.value ?? stats.recentMean,
-      messageEn: `Historical diagnostic mode (${stats.startYear}–${stats.endYear}). Latest mean: ${stats.recentMean.toFixed(decimals)} ${unit}. Switch to Sen's Slope or CMIP6 SSP5-8.5 to evaluate 2026–2035 threshold crossings.`,
-      messageDe: `Historischer Diagnosemodus (${stats.startYear}–${stats.endYear}). Aktuelles Mittel: ${stats.recentMean.toFixed(decimals)} ${unit}. Wähle Sen-Extrapolation oder CMIP6 SSP5-8.5 für 2026–2035 Schwellenwert-Prognosen.`,
+      messageEn: `Historical diagnostic mode (${stats.startYear}–${stats.endYear}). Latest mean: ${stats.recentMean.toFixed(decimals)} ${unitLabel(stats.variable, 'en')}. Switch to Sen's Slope or CMIP6 SSP5-8.5 to evaluate 2026–2035 threshold crossings.`,
+      messageDe: `Historischer Diagnosemodus (${stats.startYear}–${stats.endYear}). Aktuelles Mittel: ${stats.recentMean.toFixed(decimals)} ${unitLabel(stats.variable, 'de')}. Wähle Sen-Extrapolation oder CMIP6 SSP5-8.5 für 2026–2035 Schwellenwert-Prognosen.`,
     };
   }
 
@@ -877,7 +882,8 @@ export function generateDetectiveExplainer(
 } {
   const meta = VARIABLE_META[stats.variable];
   const slopeSign = stats.sensSlopePerDecade >= 0 ? '+' : '';
-  const slopeFormatted = `${slopeSign}${stats.sensSlopePerDecade.toFixed(3)} ${meta.unit}/${lang === 'de' ? 'Dekade' : 'decade'}`;
+  const unit = unitLabel(stats.variable, lang);
+  const slopeFormatted = `${slopeSign}${stats.sensSlopePerDecade.toFixed(3)} ${unit}/${lang === 'de' ? 'Dekade' : 'decade'}`;
   const pFormatted = stats.pValue < 0.001 ? '< 0.001' : stats.pValue.toFixed(4);
 
   if (lang === 'de') {
@@ -900,7 +906,7 @@ export function generateDetectiveExplainer(
       const dirWord = stats.direction === 'increasing' ? 'aufwärtsgerichtete' : 'abwärtsgerichtete';
       return {
         headline: `Bestätigte ${dirWord} Veränderung bei ${varNameDe} (${windowLabelDe})`,
-        statisticalInterpretation: `Über ${stats.sampleCount} Jahre (${stats.startYear}–${stats.endYear}) am Standort ${regionName} erreicht der nicht-parametrische Mann-Kendall-Test Z = ${stats.mannKendallZ.toFixed(2)} (p = ${pFormatted}) und überschreitet damit die 95%-Signifikanzschwelle. Die robuste Sen-Steigung schätzt eine langfristige Rate von ${slopeFormatted} (SE = ${stats.residualSE.toFixed(3)} ${meta.unit}).`,
+        statisticalInterpretation: `Über ${stats.sampleCount} Jahre (${stats.startYear}–${stats.endYear}) am Standort ${regionName} erreicht der nicht-parametrische Mann-Kendall-Test Z = ${stats.mannKendallZ.toFixed(2)} (p = ${pFormatted}) und überschreitet damit die 95%-Signifikanzschwelle. Die robuste Sen-Steigung schätzt eine langfristige Rate von ${slopeFormatted} (SE = ${stats.residualSE.toFixed(3)} ${unit}).`,
         regionalMechanism: getRegionalPhysicsNote(stats.variable, stats.direction, 'de'),
       };
     }
@@ -918,7 +924,7 @@ export function generateDetectiveExplainer(
     const directionWord = stats.direction === 'increasing' ? 'upward' : 'downward';
     return {
       headline: `Confirmed ${directionWord} shift in ${meta.shortLabel} (${windowLabel})`,
-      statisticalInterpretation: `Across ${stats.sampleCount} years (${stats.startYear}–${stats.endYear}) at ${regionName}, the non-parametric Mann-Kendall test yields Z = ${stats.mannKendallZ.toFixed(2)} (p = ${pFormatted}), surpassing the 95% confidence threshold. Sen's Slope estimates a sustained change of ${slopeFormatted} with residual SE = ${stats.residualSE.toFixed(3)} ${meta.unit}.`,
+      statisticalInterpretation: `Across ${stats.sampleCount} years (${stats.startYear}–${stats.endYear}) at ${regionName}, the non-parametric Mann-Kendall test yields Z = ${stats.mannKendallZ.toFixed(2)} (p = ${pFormatted}), surpassing the 95% confidence threshold. Sen's Slope estimates a sustained change of ${slopeFormatted} with residual SE = ${stats.residualSE.toFixed(3)} ${unit}.`,
       regionalMechanism: getRegionalPhysicsNote(stats.variable, stats.direction, 'en'),
     };
   }

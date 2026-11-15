@@ -117,6 +117,8 @@ export interface EarthSystemDataset {
   regionName: string;
   powerSource: DataSourceStatus;
   powerLatencyMs: number;
+  /** Points sent to the NASA POWER API (one per MERRA-2 cell for drawn fields) */
+  powerPoints?: Array<{ lat: number; lon: number }>;
   recordsByVariable: Record<ClimateVariable, MonthlyRecord[]>;
   climatology: MonthlyClimatologyPoint[];
   soil: SoilProfile;
@@ -300,6 +302,10 @@ export interface SeasonRisk {
 
 export interface ForecastSources {
   history: string | null;
+  /** 'nasa_power' or 'era5land' */
+  historySource: string | null;
+  /** e.g. "1984-01 – 2026-11" */
+  historyPeriod: string | null;
   prophetMember: boolean;
   seasonalForecast: string | null;
   stationCalibration: string[] | null;

@@ -7,8 +7,11 @@ import {
   Droplets,
   Globe,
   Layers,
+  Leaf,
   Loader2,
   LocateFixed,
+  Satellite,
+  Sprout,
   PenTool,
   Thermometer,
   Trash2,
@@ -32,6 +35,13 @@ import {
   type HeatmapLayerId,
   type RegionalGrid,
 } from '../services/regionalHeatmapService';
+import {
+  GIBS_LAYERS,
+  gibsFrameFor,
+  gibsGradient,
+  gibsTileUrl,
+  type GibsLayerId,
+} from '../services/nasaGibsService';
 import type { DrawnFieldPolygon } from '../types/terrashift';
 
 interface MapTimelineTelemetry {
@@ -320,6 +330,15 @@ const HEAT_ICONS: Record<HeatmapLayerId, typeof Thermometer> = {
   moisture: Droplets,
 };
 
+const SAT_ICONS: Record<GibsLayerId, typeof Thermometer> = {
+  ndvi: Leaf,
+  lst: Thermometer,
+  smap: Sprout,
+};
+// NASA GIBS rasters: two sources take turns so a new date fades in only once its tiles are there
+const SAT_IDS = ['gibs-a', 'gibs-b'] as const;
+const SAT_OPACITY = 0.82;
+
 function hexToRgba(hex: string, alpha: number): string {
   const n = parseInt(hex.slice(1), 16);
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
@@ -427,10 +446,10 @@ export function GeospatialMap({
   onClearDrawnField,
   focusTarget,
 }: GeospatialMapProps) {
-  const { t } = useI18n();
+  const { lang, t } = useI18n();
   const [basemap, setBasemap] = useState<BasemapMode>('satellite');
-  // Field polygon drawing is enabled as the default interaction mode
-  const [isDrawingField, setIsDrawingField] = useState<boolean>(true);
+  // Clicks pick a site by default; drawing a field is started explicitly
+  const [isDrawingField, setIsDrawingField] = useState<boolean>(false);
   const [draftVertices, setDraftVertices] = useState<Array<[number, number]>>([]);
   const [cursorCoord, setCursorCoord] = useState<[number, number] | null>(null);
   const [styleRevision, setStyleRevision] = useState<number>(0);
@@ -441,6 +460,8 @@ export function GeospatialMap({
   const [heatFrame, setHeatFrame] = useState<GridFrame | null>(null);
   const [heatCursorValue, setHeatCursorValue] = useState<number | null>(null);
   const [heatTooClose, setHeatTooClose] = useState<boolean>(false);
+  const [satLayer, setSatLayer] = useState<GibsLayerId | null>(null);
+  const satRef = useRef({ front: 0, pending: -1, key: '', fadeTimer: 0 as ReturnType<typeof setTimeout> | 0 });
 
   const heatLayerRef = useRef(heatLayer);
   heatLayerRef.current = heatLayer;
@@ -863,6 +884,65 @@ export function GeospatialMap({
     });
   };
 
+  const fadeSat = (map: mapboxgl.Map) => {
+    const sat = satRef.current;
+    if (sat.pending < 0) return;
+    clearTimeout(sat.fadeTimer);
+    const next = sat.pending;
+    sat.pending = -1;
+    SAT_IDS.forEach((id, i) => {
+      if (map.getLayer(id)) map.setPaintProperty(id, 'raster-opacity', i === next ? SAT_OPACITY : 0);
+    });
+    sat.front = next;
+  };
+
+  /** Loads a GIBS date into the hidden raster, then cross-fades to it. */
+  const pushSatFrame = (map: mapboxgl.Map, layerId: GibsLayerId, date: string) => {
+    const sat = satRef.current;
+    const key = `${layerId}/${date}`;
+    const spec = GIBS_LAYERS[layerId];
+    if (sat.key === key && map.getLayer(SAT_IDS[sat.front])) return;
+    sat.key = key;
+    const back = 1 - sat.front;
+    const id = SAT_IDS[back];
+    if (map.getLayer(id)) map.removeLayer(id);
+    if (map.getSource(id)) map.removeSource(id);
+    map.addSource(id, {
+      type: 'raster',
+      tiles: [gibsTileUrl(spec, date)],
+      tileSize: 256,
+      maxzoom: spec.maxzoom,
+      attribution: 'NASA GIBS / EOSDIS',
+    });
+    map.addLayer(
+      {
+        id,
+        type: 'raster',
+        source: id,
+        paint: {
+          'raster-opacity': 0,
+          'raster-opacity-transition': { duration: 450, delay: 0 },
+          'raster-resampling': spec.resampling,
+          'raster-fade-duration': 0,
+        },
+      },
+      map.getLayer('site-neighborhood-outline') ? 'site-neighborhood-outline' : undefined
+    );
+    sat.pending = back;
+    clearTimeout(sat.fadeTimer);
+    sat.fadeTimer = setTimeout(() => fadeSat(map), 1500); // missing tiles never report "loaded"
+  };
+
+  const hideSat = (map: mapboxgl.Map) => {
+    const sat = satRef.current;
+    clearTimeout(sat.fadeTimer);
+    sat.pending = -1;
+    sat.key = '';
+    SAT_IDS.forEach((id) => {
+      if (map.getLayer(id)) map.setPaintProperty(id, 'raster-opacity', 0);
+    });
+  };
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -884,6 +964,7 @@ export function GeospatialMap({
         minZoom: 3,
         maxZoom: 18,
         attributionControl: false,
+        logoPosition: 'bottom-right', // bottom-left holds the site legend; the logo must stay visible
       });
     } catch (err) {
       setMapError(err instanceof Error ? err.message : 'WebGL initialization failed.');
@@ -900,6 +981,7 @@ export function GeospatialMap({
 
     map.on('style.load', () => {
       setMapError(null);
+      satRef.current.key = ''; // a new style dropped the rasters
       syncMapboxLayers(map);
       ensureHeatLayers(map);
       setStyleRevision((r) => r + 1);
@@ -910,6 +992,10 @@ export function GeospatialMap({
     });
 
     map.on('sourcedata', (event) => {
+      const satPending = satRef.current.pending;
+      if (satPending >= 0 && event.sourceId === SAT_IDS[satPending] && map.isSourceLoaded(event.sourceId)) {
+        fadeSat(map);
+      }
       const pending = heatRef.current.pending;
       if (pending && event.sourceId === HEAT_SOURCE_IDS[pending.layer] && map.isSourceLoaded(event.sourceId)) {
         runHeatFade(map);
@@ -1052,6 +1138,7 @@ export function GeospatialMap({
     if (!map || active === prevHeatActiveRef.current) return;
     prevHeatActiveRef.current = active;
     if (active) {
+      setSatLayer(null);
       if (isDrawingRef.current && draftVerticesRef.current.length === 0) {
         setIsDrawingField(false); // clicks select sites while a climate layer is shown
       }
@@ -1116,6 +1203,23 @@ export function GeospatialMap({
     pushHeatFrame(map, buildHeatGeoJson(heatGrid, heatFrame), heatColorExpression(heatGrid.layer.colors));
   }, [heatFrame, styleRevision]);
 
+  // NASA GIBS image for the middle month of the timeline period (July for a whole year)
+  const satMonth = heatMonths[Math.floor(heatMonths.length / 2)];
+  const satFrame = satLayer ? gibsFrameFor(GIBS_LAYERS[satLayer], satMonth.year, satMonth.month) : null;
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || styleRevision === 0) return;
+    if (!satLayer || !satFrame) hideSat(map);
+    else pushSatFrame(map, satLayer, satFrame.date);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the frame's date is what changes the image
+  }, [satLayer, satFrame?.date, styleRevision]);
+
+  const toggleSatLayer = (id: GibsLayerId) => {
+    setSatLayer((cur) => (cur === id ? null : id));
+    setHeatLayer(null);
+    if (isDrawingRef.current && draftVerticesRef.current.length === 0) setIsDrawingField(false);
+  };
+
   useEffect(() => {
     const map = mapRef.current;
     if (!map || styleRevision === 0) return;
@@ -1137,11 +1241,8 @@ export function GeospatialMap({
 
   return (
     <div className="flex flex-col bg-panel h-full min-w-0 overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 sm:px-5 py-3">
-        <div>
-          <h2 className="text-sm font-semibold text-ink">{t.map.title}</h2>
-          <p className="text-xs text-ink-2 mt-0.5">{t.map.subtitle}</p>
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 sm:px-5 py-2.5">
+        <h2 className="text-sm font-semibold text-ink">{t.map.title}</h2>
 
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-px bg-line border border-line">
@@ -1212,61 +1313,6 @@ export function GeospatialMap({
         </div>
       </div>
 
-      {/* Dedicated Non-Overlapping Drawing Toolbar Strip */}
-      {isDrawingField && (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-ground px-4 sm:px-5 py-2 text-xs">
-          <div className="flex items-center gap-2 text-ink-2">
-            <span className="h-2 w-2 rounded-full bg-crop shrink-0" />
-            <span>{t.map.drawingHint}</span>
-            {draftPreviewMetrics && (
-              <span className="font-mono text-crop tabular-nums">
-                · {draftPreviewMetrics.areaHectares.toFixed(2)} ha
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => setDraftVertices((prev) => prev.slice(0, -1))}
-              disabled={draftVertices.length === 0}
-              className="inline-flex items-center gap-1 rounded-md border border-line bg-panel px-2.5 py-1 text-xs text-ink hover:border-line-strong disabled:opacity-40 transition-colors duration-200 ease-out cursor-pointer"
-            >
-              <Undo2 className="h-3 w-3" aria-hidden="true" />
-              <span>{t.map.drawUndo}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => finishDrawing(draftVertices)}
-              disabled={draftVertices.length < 3}
-              className="inline-flex items-center gap-1 rounded-md bg-crop px-2.5 py-1 text-xs font-medium text-ground hover:bg-crop/90 disabled:opacity-40 transition-colors duration-200 ease-out cursor-pointer"
-            >
-              <Check className="h-3 w-3" aria-hidden="true" />
-              <span>
-                {t.map.drawFinish}
-                {draftPreviewMetrics
-                  ? ` (${draftPreviewMetrics.areaHectares.toFixed(1)} ha)`
-                  : ''}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setIsDrawingField(false);
-                setDraftVertices([]);
-                setCursorCoord(null);
-              }}
-              className="inline-flex items-center gap-1 rounded-md border border-line bg-panel px-2.5 py-1 text-xs text-ink-2 hover:text-ink transition-colors duration-200 ease-out cursor-pointer"
-            >
-              <X className="h-3 w-3" aria-hidden="true" />
-              <span>{t.map.drawCancel}</span>
-            </button>
-          </div>
-        </div>
-      )}
-
       <div className="relative flex-1 min-h-[380px] lg:min-h-0 w-full overflow-hidden isolate z-0 bg-ground">
         <div ref={containerRef} className="absolute inset-0 h-full w-full" />
 
@@ -1290,9 +1336,10 @@ export function GeospatialMap({
 
         {/* Top-Right Climate Layer Toggles + Legend */}
         <div className="pointer-events-none absolute top-3 right-3 z-10 flex w-[min(17.5rem,calc(100%-4.5rem))] flex-col items-end gap-2">
-          <div className="pointer-events-auto w-full border border-line bg-ground/85 backdrop-blur-md p-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.35)]">
-            <div className="px-1 pb-1.5 text-[9px] font-mono text-ink-3">
-              {t.map.heatTitle}
+          <div className="pointer-events-auto w-full rounded-lg border border-line bg-panel/90 backdrop-blur-md p-1.5 shadow-[0_8px_24px_rgba(28,38,31,0.18)]">
+            <div className="flex items-baseline justify-between px-1 pb-1">
+              <span className="text-[11px] font-semibold text-ink">{t.map.heatTitle}</span>
+              <span className="text-[10px] text-ink-3">NASA POWER</span>
             </div>
             <div className="grid grid-cols-3 gap-1">
               {(Object.keys(HEATMAP_LAYERS) as HeatmapLayerId[]).map((id) => {
@@ -1328,7 +1375,88 @@ export function GeospatialMap({
                 );
               })}
             </div>
+
+            <div className="mt-1.5 flex items-baseline justify-between border-t border-line px-1 pb-1 pt-1.5">
+              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-ink">
+                <Satellite className="h-3 w-3" aria-hidden="true" />
+                {t.map.satTitle}
+              </span>
+              <span className="text-[10px] text-ink-3">NASA GIBS</span>
+            </div>
+            <div className="grid grid-cols-3 gap-1">
+              {(Object.keys(GIBS_LAYERS) as GibsLayerId[]).map((id) => {
+                const Icon = SAT_ICONS[id];
+                const active = satLayer === id;
+                const spec = GIBS_LAYERS[id];
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => toggleSatLayer(id)}
+                    className={`group relative flex flex-col items-center gap-1 overflow-hidden rounded-md border px-1 pt-1.5 pb-2 text-[10px] transition-all duration-300 ease-out cursor-pointer ${
+                      active
+                        ? 'border-line-strong bg-raised text-ink'
+                        : 'border-transparent bg-transparent text-ink-2 hover:bg-panel hover:text-ink'
+                    }`}
+                  >
+                    <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span className="leading-none whitespace-nowrap">{t.map.sat[id]}</span>
+                    <span
+                      className={`absolute inset-x-1 bottom-0.5 h-[3px] rounded-full transition-all duration-300 ease-out ${
+                        active ? 'opacity-100' : 'opacity-25 group-hover:opacity-60'
+                      }`}
+                      style={{ background: gibsGradient(spec) }}
+                    />
+                  </button>
+                );
+              })}
+            </div>
           </div>
+
+          {satLayer && (() => {
+            const spec = GIBS_LAYERS[satLayer];
+            const fmtDay = (d: string) =>
+              new Intl.DateTimeFormat(lang, { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${d}T00:00:00Z`));
+            const fmtMonth = (d: string) =>
+              new Intl.DateTimeFormat(lang, { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${d}T00:00:00Z`));
+            const when = !satFrame
+              ? null
+              : spec.cadence === 'monthly'
+                ? fmtMonth(satFrame.date)
+                : spec.cadence === 'p16d'
+                  ? `${fmtDay(satFrame.date)} – ${fmtDay(satFrame.until)}`
+                  : fmtDay(satFrame.date);
+            const lo = spec.stops[0][0];
+            const hi = spec.stops[spec.stops.length - 1][0];
+            return (
+              <div key={satLayer} className="pointer-events-auto w-full rounded-lg border border-line bg-panel/90 backdrop-blur-md px-3 py-2.5 shadow-[0_8px_24px_rgba(28,38,31,0.18)] heat-legend-enter">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-xs font-semibold text-ink">{t.map.satLong[satLayer]}</span>
+                  <span className="text-[10px] text-ink-3 whitespace-nowrap">{spec.resolution}</span>
+                </div>
+                {when ? (
+                  <>
+                    <div key={satFrame?.date} className="mt-0.5 text-[11px] tabular-nums text-crop heat-month-tick">{when}</div>
+                    <div className="mt-2 h-2.5 w-full rounded-[2px] ring-1 ring-black/10" style={{ background: gibsGradient(spec) }} />
+                    <div className="mt-1 flex justify-between text-[10px] tabular-nums text-ink-3">
+                      <span>{lo} {spec.unit}</span>
+                      <span>{hi} {spec.unit}</span>
+                    </div>
+                    {satFrame?.match === 'latest' && <p className="mt-1.5 text-[10px] leading-snug text-warn">{t.map.satLatest}</p>}
+                    {satFrame?.match === 'nearest' && <p className="mt-1.5 text-[10px] leading-snug text-ink-3">{t.map.satNearest}</p>}
+                  </>
+                ) : (
+                  <p className="mt-1.5 text-[11px] leading-snug text-warn">
+                    {t.map.satBefore.replace('{date}', fmtMonth(spec.first))}
+                  </p>
+                )}
+                <p className="mt-1.5 border-t border-line pt-1.5 text-[10px] leading-snug text-ink-3">
+                  {spec.product} · NASA GIBS / EOSDIS
+                </p>
+              </div>
+            );
+          })()}
 
           {heatLayer && (() => {
             const spec = HEATMAP_LAYERS[heatLayer];
@@ -1422,8 +1550,64 @@ export function GeospatialMap({
           )}
         </div>
 
+        {/* Drawing toolbar floats over the map so the map keeps its height */}
+        {isDrawingField && (
+          <div className="pointer-events-auto absolute inset-x-3 bottom-3 z-20 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-panel/95 px-3 py-2 text-xs shadow-[0_8px_24px_rgba(28,38,31,0.18)] backdrop-blur-md heat-legend-enter">
+            <div className="flex items-center gap-2 text-ink-2">
+              <span className="h-2 w-2 rounded-full bg-crop shrink-0" />
+              <span>{t.map.drawingHint}</span>
+              {draftPreviewMetrics && (
+                <span className="font-mono text-crop tabular-nums">
+                  · {draftPreviewMetrics.areaHectares.toFixed(2)} ha
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setDraftVertices((prev) => prev.slice(0, -1))}
+                disabled={draftVertices.length === 0}
+                className="inline-flex items-center gap-1 rounded-md border border-line bg-panel px-2.5 py-1 text-xs text-ink hover:border-line-strong disabled:opacity-40 transition-colors duration-200 ease-out cursor-pointer"
+              >
+                <Undo2 className="h-3 w-3" aria-hidden="true" />
+                <span>{t.map.drawUndo}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => finishDrawing(draftVertices)}
+                disabled={draftVertices.length < 3}
+                className="inline-flex items-center gap-1 rounded-md bg-crop px-2.5 py-1 text-xs font-medium text-ground hover:bg-crop/90 disabled:opacity-40 transition-colors duration-200 ease-out cursor-pointer"
+              >
+                <Check className="h-3 w-3" aria-hidden="true" />
+                <span>
+                  {t.map.drawFinish}
+                  {draftPreviewMetrics
+                    ? ` (${draftPreviewMetrics.areaHectares.toFixed(1)} ha)`
+                    : ''}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDrawingField(false);
+                  setDraftVertices([]);
+                  setCursorCoord(null);
+                }}
+                className="inline-flex items-center gap-1 rounded-md border border-line bg-panel px-2.5 py-1 text-xs text-ink-2 hover:text-ink transition-colors duration-200 ease-out cursor-pointer"
+              >
+                <X className="h-3 w-3" aria-hidden="true" />
+                <span>{t.map.drawCancel}</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Bottom-Left Site / Field Coordinates & Scale Legend */}
-        <div className="pointer-events-auto absolute bottom-3 left-3 z-10 max-w-[calc(100%-5rem)] sm:max-w-[78%] border border-line bg-ground/95 px-2.5 py-1.5 space-y-1">
+        {!isDrawingField && (
+        <div className="pointer-events-auto absolute bottom-3 left-3 z-10 max-w-[calc(100%-5rem)] sm:max-w-[78%] rounded-md border border-line bg-panel/95 px-2.5 py-1.5 space-y-1 shadow-[0_1px_3px_rgba(28,38,31,0.12)]">
           <div className="flex items-center gap-2 font-mono text-[11px] tabular-nums tracking-tight text-ink">
             {drawnField ? (
               <>
@@ -1479,6 +1663,7 @@ export function GeospatialMap({
             </div>
           )}
         </div>
+        )}
       </div>
     </div>
   );

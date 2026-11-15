@@ -227,7 +227,8 @@ def root():
     return {
         "status": "ok",
         "docs": "/docs",
-        "endpoints": ["/variables", "/history", "/forecast", "/agri-summary", "/risk", "/soil", "/calibration", "/cache"],
+        "endpoints": ["/variables", "/history", "/forecast", "/agri-summary", "/risk", "/soil", "/rotation",
+                      "/pollution", "/calibration", "/cache"],
     }
 
 

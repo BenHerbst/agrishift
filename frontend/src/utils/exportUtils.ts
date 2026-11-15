@@ -6,7 +6,7 @@ import {
   localizeSoilTexture,
   type AppLanguage,
 } from '../i18n/translations';
-import { VARIABLE_META, localizeTrendClassification } from './statistics';
+import { VARIABLE_META, localizeTrendClassification, unitLabel } from './statistics';
 import type {
   AgroBriefingResponse,
   AnnualPoint,
@@ -292,7 +292,7 @@ export function exportSitePdfReport(params: {
     const activeMark = v === selectedVariable ? (lang === 'de' ? ' [Aktiv]' : ' [Active]') : '';
 
     writeWrapped(
-      `• ${label}${activeMark}: ${sign}${st.sensSlopePerDecade.toFixed(dec)} ${meta.unit}/${
+      `• ${label}${activeMark}: ${sign}${st.sensSlopePerDecade.toFixed(dec)} ${unitLabel(v, lang)}/${
         lang === 'de' ? 'Dekade' : 'decade'
       }  |  Z = ${st.mannKendallZ.toFixed(2)}, p = ${pTxt} (${st.confidencePct.toFixed(1)}%) — ${classTxt}`,
       9.5,

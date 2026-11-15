@@ -108,12 +108,18 @@ function percentile(sorted: number[], q: number): number {
   return sorted[idx];
 }
 
-async function loadGrid(layer: HeatmapLayerSpec, lat: number, lon: number): Promise<RegionalGrid> {
+/** NASA POWER monthly regional request for one layer around a site. */
+export function regionalGridUrl(layerId: HeatmapLayerId, lat: number, lon: number): string {
   const box = regionalBox(lat, lon);
-  const url =
-    `https://power.larc.nasa.gov/api/temporal/monthly/regional?parameters=${layer.parameter}&community=AG` +
+  return (
+    `https://power.larc.nasa.gov/api/temporal/monthly/regional?parameters=${HEATMAP_LAYERS[layerId].parameter}&community=AG` +
     `&latitude-min=${box.latMin}&latitude-max=${box.latMax}&longitude-min=${box.lonMin}&longitude-max=${box.lonMax}` +
-    `&start=${MEASURED_START_YEAR}&end=${MEASURED_END_YEAR}&format=JSON`;
+    `&start=${MEASURED_START_YEAR}&end=${MEASURED_END_YEAR}&format=JSON`
+  );
+}
+
+async function loadGrid(layer: HeatmapLayerSpec, lat: number, lon: number): Promise<RegionalGrid> {
+  const url = regionalGridUrl(layer.id, lat, lon);
   const res = await fetch(`/api/cached?url=${encodeURIComponent(url)}`);
   if (!res.ok) throw new Error(`NASA POWER regional request failed (${res.status})`);
   const json = (await res.json()) as PowerRegionalResponse;

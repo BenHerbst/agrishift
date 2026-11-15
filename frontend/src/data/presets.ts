@@ -9,11 +9,12 @@ import type {
 export const PRESET_REGIONS: PresetRegion[] = [
   {
     id: 'aachen',
-    name: 'Rheinisches Revier / Aachen, Germany',
-    shortName: 'Aachen, DE',
+    name: 'Rheinisches Revier / Jülich Börde, Germany',
+    shortName: 'Jülich Börde, DE',
     country: 'Germany',
-    lat: 50.7753,
-    lon: 6.0839,
+    // Arable loess field between Aldenhoven and Jülich (SoilGrids has no data for built-up Aachen)
+    lat: 50.8836,
+    lon: 6.3053,
     climateZone: 'Temperate Maritime Loess Belt',
     defaultBaselineCrop: 'wheat_maize',
     summary: 'Deep fertile loess soils experiencing accelerating summer heat stress and spring-to-summer moisture deficits.',
@@ -79,7 +80,7 @@ interface ClimateArchetype {
 
 function getArchetypeForCoords(lat: number, lon: number): ClimateArchetype {
   // Match known presets closely, otherwise derive from latitude/longitude
-  if (Math.abs(lat - 50.7753) < 1.5 && Math.abs(lon - 6.0839) < 1.5) {
+  if (Math.abs(lat - 50.8836) < 1.5 && Math.abs(lon - 6.3053) < 1.5) {
     return {
       baseTemp: 10.1,
       tempAmp: 8.6,

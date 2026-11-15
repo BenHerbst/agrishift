@@ -6,6 +6,7 @@ import {
 } from './components/GlobalTimelineBar';
 import { LocationOnboarding } from './components/LocationOnboarding';
 import { GeospatialMap, type MapFocusTarget } from './components/GeospatialMap';
+import { DataSourcesPanel } from './components/DataSourcesPanel';
 import { RightDataPanel, type RightPanelTab } from './components/RightDataPanel';
 import { LegalPage, type LegalRoute } from './components/LegalPage';
 import { CookieBanner } from './components/CookieBanner';
@@ -15,12 +16,13 @@ import {
   BASELINE_CROP_TEXT,
   MONTH_SHORT_BY_LANG,
   localizeRegionName,
+  localizeSoilTexture,
 } from './i18n/translations';
 import {
   fetchEarthSystemData,
   fetchFieldAverageEarthSystemData,
 } from './services/earthDataService';
-import { fetchClimateForecast } from './services/climateForecastService';
+import { fetchClimateForecast, fetchRotationPlan, type RotationPlan } from './services/climateForecastService';
 import type { SavedField } from './services/savedFieldsService';
 import {
   analyzeClimateSeries,
@@ -254,6 +256,28 @@ export default function App() {
 
   const retryForecast = useCallback(() => setForecastRetryToken((n) => n + 1), []);
 
+  // Crop rotation from the backend, once the forecast it builds on is ready (cached → instant)
+  const [rotationPlan, setRotationPlan] = useState<RotationPlan | null>(null);
+  const [rotationStatus, setRotationStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  useEffect(() => {
+    setRotationPlan(null);
+    if (forecastStatus !== 'ready') {
+      setRotationStatus(forecastStatus === 'error' ? 'error' : 'idle');
+      return;
+    }
+    const controller = new AbortController();
+    setRotationStatus('loading');
+    fetchRotationPlan(coords.lat, coords.lon, controller.signal)
+      .then((plan) => {
+        setRotationPlan(plan);
+        setRotationStatus('ready');
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setRotationStatus('error');
+      });
+    return () => controller.abort();
+  }, [forecastStatus, coords.lat, coords.lon]);
+
   useEffect(() => {
     setAiBriefing(null);
     setAiError(null);
@@ -320,6 +344,9 @@ export default function App() {
 
   // Camera jumps only for sites opened from outside the map (saved fields); map clicks never move it
   const [mapFocus, setMapFocus] = useState<MapFocusTarget | null>(null);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
+  const openSources = useCallback(() => setSourcesOpen(true), []);
+  const closeSources = useCallback(() => setSourcesOpen(false), []);
   const [openedSaved, setOpenedSaved] = useState<SavedField | null>(null);
   const handleLoadSavedField = useCallback((saved: SavedField) => {
     setOpenedSaved(saved);
@@ -569,7 +596,7 @@ export default function App() {
       lat: timeSlicedDataset.lat,
       lon: timeSlicedDataset.lon,
       seasonalWindow,
-      soil: timeSlicedDataset.soil,
+      soil: { ...timeSlicedDataset.soil, textureClass: localizeSoilTexture(timeSlicedDataset.soil.textureClass, lang) },
       statsByVariable: analyzedByVariable.statsByVariable,
       priorities,
       baselineCropLabel: baselineLabel,
@@ -706,6 +733,7 @@ export default function App() {
             onExportPdf={handleExportPdf}
             drawnField={drawnField}
             onLoadSaved={handleLoadSavedField}
+            onOpenSources={openSources}
           />
 
           <main className="mx-auto w-full max-w-[1600px] flex-1 lg:min-h-0 border-x border-line bg-line flex flex-col gap-px">
@@ -782,15 +810,22 @@ export default function App() {
                   isBriefingLoading={isAiLoading}
                   briefingError={aiError}
                   onRegenerateBriefing={requestAiBriefing}
+                  rotationPlan={rotationPlan}
+                  rotationStatus={rotationStatus}
                 />
               </div>
             </section>
           </main>
 
-          <footer className="border-t border-line bg-ground py-4">
+          <footer className="border-t border-line bg-ground py-2.5">
             <div className="mx-auto max-w-[1600px] px-4 sm:px-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between text-xs text-ink-3">
-              <span>{t.footer.left}</span>
-              <div className="flex flex-wrap items-center gap-4">
+              <span className="truncate">
+                {t.footer.left} ·{' '}
+                <button type="button" onClick={openSources} className="font-medium text-crop hover:underline cursor-pointer">
+                  {t.footer.sources}
+                </button>
+              </span>
+              <div className="flex flex-wrap items-center gap-4 shrink-0">
                 <a
                   href="/impressum"
                   onClick={(e) => {
@@ -821,13 +856,17 @@ export default function App() {
                 >
                   {t.footer.cookies}
                 </a>
-                <span className="hidden md:inline text-line" aria-hidden="true">
-                  |
-                </span>
-                <span className="hidden md:inline">{t.footer.right}</span>
               </div>
             </div>
           </footer>
+
+          <DataSourcesPanel
+            open={sourcesOpen}
+            onClose={closeSources}
+            dataset={dataset}
+            forecast={forecastDataset}
+            forecastStatus={forecastStatus}
+          />
         </div>
       )}
 

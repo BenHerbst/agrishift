@@ -153,6 +153,11 @@ input[type="range"] {
 }
 .heat-legend-enter { animation: heat-legend-enter 320ms cubic-bezier(0.22, 1, 0.36, 1); }
 .heat-month-tick { display: inline-block; animation: heat-month-tick 260ms ease-out; }
+@keyframes sources-panel-enter {
+  from { transform: translateX(24px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+.sources-panel-enter { animation: sources-panel-enter 260ms cubic-bezier(0.22, 1, 0.36, 1); }
 @media (prefers-reduced-motion: reduce) {
-  .heat-legend-enter, .heat-month-tick { animation: none; }
+  .heat-legend-enter, .heat-month-tick, .sources-panel-enter { animation: none; }
 }
