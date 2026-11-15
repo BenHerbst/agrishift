@@ -42,7 +42,7 @@ def read_cache(lat: float, lon: float) -> Optional[pd.DataFrame]:
     path = _cache_file(lat, lon)
     if not path.exists():
         return None
-    return pd.read_csv(path, index_col="date", parse_dates=True)[list(DAILY_VARS.values())]
+    return pd.read_csv(path, index_col="date", parse_dates=True)[DAILY_VARS]
 
 
 def hourly_to_daily(hourly: pd.DataFrame, lat: float, lon: float) -> pd.DataFrame:
@@ -73,7 +73,7 @@ def hourly_to_daily(hourly: pd.DataFrame, lat: float, lon: float) -> pd.DataFram
     complete = g["t"].count() >= 23  # drop the partial first/last local day
     daily = daily[complete]
     daily.index.name = "date"
-    return daily[list(DAILY_VARS.values())]
+    return daily[DAILY_VARS]
 
 
 def _read_zip(raw: bytes) -> pd.DataFrame:

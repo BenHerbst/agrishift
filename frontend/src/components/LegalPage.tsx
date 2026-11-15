@@ -201,7 +201,7 @@ export function LegalPage({ route, onNavigate }: LegalPageProps) {
                         <strong className="text-[#ECEEF0]">ISRIC SoilGrids:</strong> Abruf lokaler Oberboden-Kennwerte (0–30 cm).
                       </li>
                       <li>
-                        <strong className="text-[#ECEEF0]">Open-Meteo &amp; OpenStreetMap Nominatim:</strong> Ortsnamensuche und Umwandlung von GPS-Koordinaten in Ortsnamen.
+                        <strong className="text-[#ECEEF0]">Photon (komoot) &amp; OpenStreetMap Nominatim:</strong> Ortsnamensuche und Umwandlung von GPS-Koordinaten in Ortsnamen, beides auf Basis von OpenStreetMap-Daten.
                       </li>
                     </ul>
                   </section>
@@ -251,7 +251,7 @@ export function LegalPage({ route, onNavigate }: LegalPageProps) {
                         <strong className="text-[#ECEEF0]">ISRIC SoilGrids:</strong> Topsoil properties (0–30 cm).
                       </li>
                       <li>
-                        <strong className="text-[#ECEEF0]">Open-Meteo &amp; OpenStreetMap Nominatim:</strong> Place search and reverse geocoding.
+                        <strong className="text-[#ECEEF0]">Photon (komoot) &amp; OpenStreetMap Nominatim:</strong> Place search and reverse geocoding, both based on OpenStreetMap data.
                       </li>
                     </ul>
                   </section>

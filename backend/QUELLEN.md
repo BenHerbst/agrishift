@@ -12,15 +12,13 @@ mit `scripts/hindcast.py`. Die Rohdaten dazu liegen in `outputs/`.
 
 | Quelle | Wofür | Lizenz |
 |---|---|---|
-| **Open-Meteo Historical Weather API**: https://open-meteo.com/en/docs/historical-weather-api | Tägliche Wetterdaten ab 1980 für jeden Ort | CC BY 4.0 |
-| Zippenfenig, P. (2023). *Open-Meteo.com Weather API*. Zenodo. https://doi.org/10.5281/zenodo.7970649 | Zitierweise für Open-Meteo | |
-| **ERA5**: Hersbach, H. et al. (2020). The ERA5 global reanalysis. *Quarterly Journal of the Royal Meteorological Society*, 146(730), 1999–2049. https://doi.org/10.1002/qj.3803 | Reanalyse hinter den Open-Meteo-Daten (Temperatur, Niederschlag, Strahlung, Wind, Feuchte) | Copernicus-Lizenz |
+| **ERA5**: Hersbach, H. et al. (2020). The ERA5 global reanalysis. *Quarterly Journal of the Royal Meteorological Society*, 146(730), 1999–2049. https://doi.org/10.1002/qj.3803 | Reanalyse, aus der ERA5-Land hervorgeht (Temperatur, Niederschlag, Strahlung, Wind, Feuchte) | Copernicus-Lizenz |
 | **ERA5-Land**: Muñoz-Sabater, J. et al. (2021). ERA5-Land: a state-of-the-art global reanalysis dataset for land applications. *Earth System Science Data*, 13, 4349–4383. https://doi.org/10.5194/essd-13-4349-2021 | Bodenfeuchte in drei Tiefen, feinere Auflösung (~9 km) | Copernicus-Lizenz |
 | **ERA5-Land hourly time-series** (Copernicus Climate Data Store): https://cds.climate.copernicus.eu/datasets/reanalysis-era5-land-timeseries | **Hauptquelle:** stündliche Punktzeitreihen direkt von Copernicus, daraus Tageswerte und ET0 | Copernicus-Lizenz |
 | **NASA POWER**: https://power.larc.nasa.gov. *These data were obtained from the NASA Langley Research Center (LaRC) POWER Project funded through the NASA Earth Science/Applied Science Program.* | Ersatzquelle 1: tägliche Agrar-Wetterdaten ab 1984 | frei, Quellenangabe |
 | Gelaro, R. et al. (2017). The Modern-Era Retrospective Analysis for Research and Applications, Version 2 (MERRA-2). *Journal of Climate*, 30, 5419–5454. https://doi.org/10.1175/JCLI-D-16-0758.1 | Reanalyse hinter NASA POWER | |
 
-Reihenfolge: ERA5-Land von Copernicus → NASA POWER → Open-Meteo (siehe `app/sources.py`).
+Reihenfolge: ERA5-Land von Copernicus → NASA POWER (siehe `app/sources.py`).
 
 ### Klimaprojektionen
 
@@ -35,15 +33,16 @@ Reihenfolge: ERA5-Land von Copernicus → NASA POWER → Open-Meteo (siehe `app/
 | **CNRM-CM6-1-HR**: Voldoire, A. et al. (2019). Evaluation of CMIP6 DECK experiments with CNRM-CM6-1. *Journal of Advances in Modeling Earth Systems*, 11, 2177–2213. https://doi.org/10.1029/2019MS001683 | Klimamodell 2 |
 | **IPSL-CM6A-LR**: Boucher, O. et al. (2020). Presentation and evaluation of the IPSL-CM6A-LR climate model. *Journal of Advances in Modeling Earth Systems*, 12, e2019MS002010. https://doi.org/10.1029/2019MS002010 | Klimamodell 3 |
 
-**Ersatzquelle: Open-Meteo Climate API (CMIP6 HighResMIP)**
+Sind die CMIP6-Daten für einen Ort noch nicht heruntergeladen, läuft die Prognose ohne das Klimamodell-Mitglied.
 
-| Quelle | Wofür |
-|---|---|
-| **Open-Meteo Climate API**: https://open-meteo.com/en/docs/climate-api | CMIP6-Projektionen 2000–2040, täglich |
-| **HighResMIP**: Haarsma, R. J. et al. (2016). High Resolution Model Intercomparison Project (HighResMIP v1.0) for CMIP6. *Geoscientific Model Development*, 9, 4185–4208. https://doi.org/10.5194/gmd-9-4185-2016 | Rahmen der verwendeten Klimamodell-Läufe |
-| **EC-Earth3P-HR**: Haarsma, R. et al. (2020). HighResMIP versions of EC-Earth: EC-Earth3P and EC-Earth3P-HR. *Geoscientific Model Development*, 13, 3507–3527. https://doi.org/10.5194/gmd-13-3507-2020 | Klimamodell 1 |
-| **MPI-ESM1.2-XR**: Gutjahr, O. et al. (2019). Max Planck Institute Earth System Model (MPI-ESM1.2) for the High-Resolution Model Intercomparison Project (HighResMIP). *Geoscientific Model Development*, 12, 3241–3281. https://doi.org/10.5194/gmd-12-3241-2019 | Klimamodell 2 |
-| **MRI-AGCM3.2-S**: Mizuta, R. et al. (2012). Climate simulations using MRI-AGCM3.2 with 20-km grid. *Journal of the Meteorological Society of Japan*, 90A, 233–258. https://doi.org/10.2151/jmsj.2012-A12 | Klimamodell 3 |
+### Luftqualität und Verschmutzungsquellen (`/pollution`)
+
+| Quelle | Wofür | Lizenz |
+|---|---|---|
+| **CAMS global reanalysis (EAC4)**, Copernicus Atmosphere Data Store: https://ads.atmosphere.copernicus.eu/datasets/cams-global-reanalysis-eac4 | Ozon (AOT40), NO₂, SO₂, PM2.5 am Boden, 3-stündlich | Copernicus-Lizenz |
+| Inness, A. et al. (2019). The CAMS reanalysis of atmospheric composition. *Atmospheric Chemistry and Physics*, 19, 3515–3556. https://doi.org/10.5194/acp-19-3515-2019 | Zitierweise für EAC4 | |
+| Richtlinie 2008/50/EG über Luftqualität und saubere Luft für Europa | AOT40-Zielwert und langfristiges Ziel, kritische Werte für die Vegetation (SO₂, NOx) | |
+| **OpenStreetMap** über die Overpass API: https://overpass-api.de | Straßen, Bahnlinien, Industrie, Kraftwerke, Flughäfen, Deponien, Steinbrüche in der Umgebung | ODbL, © OpenStreetMap-Mitwirkende |
 
 ### Klimaindizes (Modell `climate_drivers`)
 

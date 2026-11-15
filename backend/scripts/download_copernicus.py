@@ -4,6 +4,8 @@
              later runs only fetch the new days – run this monthly, e.g. from cron)
   cmip6    – CMIP6 projections, 3 models × 2 periods × 8 variables for the 5° region (cached forever)
   seas5    – ECMWF SEAS5 seasonal-forecast archive 1993 → now (new forecast every month)
+  cams     – CAMS air-quality reanalysis, last full year, for /pollution (Atmosphere Data Store: same
+             account, accept its terms once at https://ads.atmosphere.copernicus.eu)
 
 Needs ~/.cdsapirc (README → "Copernicus account"). Afterwards the API uses the data automatically and
 retrains the forecasts that depend on it.
@@ -20,9 +22,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app import cmip6, era5land  # noqa: E402
+from app.pollution import download_air_quality  # noqa: E402
 from app.seasonal import cds_configured, fetch_seasonal  # noqa: E402
 
-DATASETS = ("era5land", "cmip6", "seas5")
+DATASETS = ("era5land", "cmip6", "seas5", "cams")
 
 
 def main():
@@ -54,6 +57,9 @@ def main():
                 if error:
                     failed = True
                     print(f"\n  problems: {error}", end="")
+            elif name == "cams":
+                air = download_air_quality(args.lat, args.lon)
+                print(f"cams: {air['year']}, ozone AOT40 {air['ozone_aot40_may_jul_ug_m3_h']} µg/m³·h", end="")
             else:
                 raise ValueError(f"unknown dataset {name!r}")
             print(f"  [{time.time() - start:.0f}s]")

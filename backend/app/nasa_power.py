@@ -43,7 +43,7 @@ def to_daily(payload: dict, lat: float) -> pd.DataFrame:
     daily["et0"] = penman_monteith(p["T2M_MAX"], p["T2M_MIN"], p["ALLSKY_SFC_SW_DWN"], p["WS2M"],
                                    p["RH2M"] / 100 * es, lat, p.index.dayofyear, pressure_kpa=p["PS"])
     daily.index.name = "date"
-    return daily[list(DAILY_VARS.values())].dropna(subset=["tmax", "tmin", "precip"])
+    return daily[DAILY_VARS].dropna(subset=["tmax", "tmin", "precip"])
 
 
 def fetch(lat: float, lon: float) -> Optional[pd.DataFrame]:
@@ -64,4 +64,4 @@ def fetch(lat: float, lon: float) -> Optional[pd.DataFrame]:
         cached = new if cached is None else pd.concat([cached, new])
         cached = cached[~cached.index.duplicated(keep="last")].sort_index()
         cached.to_csv(path)
-    return cached[list(DAILY_VARS.values())] if cached is not None else None
+    return cached[DAILY_VARS] if cached is not None else None

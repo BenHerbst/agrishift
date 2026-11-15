@@ -67,13 +67,15 @@ It stays cached until a new month of data arrives.
 | `GET /agri-summary?lat=&lon=&years=3` | Per year: GDD, rain, ET0, water balance, frost/heat/wet days and root-zone moisture vs. the 1991–2020 normal, deficit months, frost-free months |
 | `GET /risk?lat=&lon=&years=3&root_depth_cm=100&kc=1.15` | Per season: probability of a dry / wet / drought / hot / frost / **water-stress** season vs. normal odds and the last 15 years, plus the **soil-aware irrigation need** (typical, 1-in-5 and 1-in-10 year) |
 | `GET /soil?lat=&lon=&root_depth_cm=100&kc=1.0` | The soil at the field: texture, organic matter, pH, CEC, layers, **plant-available water**, plain-language notes, and stress days / irrigation need per year (1991–2020 vs. last 10 years) |
+| `GET /rotation?lat=&lon=&years=3&history=winter_wheat,maize` | **Crop rotation:** one crop per forecast year from 13 field crops, scored on forecast warmth, water and heat, soil pH and storage, and nearby pollution, following rotation rules (family breaks, max. two cereal years, legumes before nitrogen-hungry crops, no wheat after maize) – with alternatives and why other crops are not possible |
+| `GET /pollution?lat=&lon=` | **Crop safety from surrounding infrastructure:** nearest motorway, main road, railway, industry, power plant, airport, landfill and quarry (OpenStreetMap), air quality (CAMS reanalysis: ozone AOT40, NO₂, SO₂, PM2.5), a safe / caution / avoid verdict per crop group and what to do |
 | `POST /calibration?lat=&lon=` | Upload daily station data (CSV) to calibrate a location |
 | `GET /calibration?lat=&lon=` | Show the corrections applied |
 | `DELETE /calibration?lat=&lon=` | Remove station data |
 | `GET /cache` | Forecasts stored on disk, with their data month and whether they match the current model code |
 | `DELETE /cache?lat=&lon=` | Delete cached forecasts for one location (or all, without parameters) |
 
-`/forecast`, `/agri-summary` and `/risk` take `refresh=true` to retrain even when a valid cached forecast exists.
+`/forecast`, `/agri-summary`, `/risk` and `/rotation` take `refresh=true` to retrain even when a valid cached forecast exists.
 
 Every forecast response has a `sources` block listing what was actually used (climate models, index dates, SEAS5, station calibration, Prophet)
 and a `cache` block (`computed`, `disk` or `memory`, plus when the forecast was created).
@@ -126,14 +128,14 @@ All sources are free and cached on disk in `data_cache/`. Every response's `sour
 |---|---|---|---|
 | 1 | [ERA5-Land](https://cds.climate.copernicus.eu/datasets/reanalysis-era5-land-timeseries) from the **Copernicus Climate Data Store** (hourly → local days, ET0 computed with FAO-56) | ~9 km, 1980 → ~6 days ago | `scripts/download_copernicus.py` (needs a Copernicus account). The API only reads the cache |
 | 2 | [NASA POWER](https://power.larc.nasa.gov) (MERRA-2 / CERES, ET0 computed with FAO-56) | ~50 km, 1984 → ~7 days ago | On demand, in a few seconds, no key |
-| 3 | [Open-Meteo Historical API](https://open-meteo.com/en/docs/historical-weather-api) (ERA5 / ERA5-Land) | ~10–25 km, 1980 → | On demand. Last resort, because of the free-tier rate limits |
 
 **Climate projections** (`PROJECTION_SOURCES`):
 
 | # | Source | Models | How it is loaded |
 |---|---|---|---|
 | 1 | [CMIP6](https://cds.climate.copernicus.eu/datasets/projections-cmip6) from the **Copernicus Climate Data Store**, historical + SSP2-4.5, monthly | MRI-ESM2.0, CNRM-CM6-1-HR, IPSL-CM6A-LR | `scripts/download_copernicus.py`, per 5° region (shared by all locations in it) |
-| 2 | [Open-Meteo Climate API](https://open-meteo.com/en/docs/climate-api) (CMIP6 HighResMIP) | EC-Earth3P-HR, MPI-ESM1.2-XR, MRI-AGCM3.2-S | On demand |
+
+Not downloaded yet → the forecast runs without the climate-model member and is retrained once the projections arrive.
 
 **Other sources:**
 
@@ -151,7 +153,9 @@ Run the download script monthly (e.g. from cron) to keep ERA5-Land and SEAS5 up 
 
 1. Create a free account at https://cds.climate.copernicus.eu
 2. Accept the licences of the datasets you use, on each dataset page under **Download → Terms of use**:
-   ERA5-Land and CMIP6 (*CMIP6 – Data Access – Terms of Use*); for SEAS5, *CC-BY 4.0* and *Additional licence to use non-European contributions*
+   ERA5-Land and CMIP6 (*CMIP6 – Data Access – Terms of Use*); for SEAS5, *CC-BY 4.0* and *Additional licence to use non-European contributions*.
+   For air quality (`/pollution`), log in once at https://ads.atmosphere.copernicus.eu with the same account and
+   accept its terms of use: the Atmosphere Data Store takes the same token.
 3. Put your API token (profile page) in `~/.cdsapirc`:
    ```
    url: https://cds.climate.copernicus.eu/api
@@ -159,7 +163,7 @@ Run the download script monthly (e.g. from cron) to keep ERA5-Land and SEAS5 up 
    ```
 4. Download a location:
    ```bash
-   python scripts/download_copernicus.py --lat 50.84 --lon 6.13                  # era5land, cmip6 and seas5
+   python scripts/download_copernicus.py --lat 50.84 --lon 6.13                  # era5land, cmip6, seas5 and cams
    python scripts/download_copernicus.py --lat 50.84 --lon 6.13 --only era5land   # just one of them
    ```
 
@@ -329,9 +333,11 @@ Downloaded data and finished forecasts are both cached, so nothing is downloaded
 
 | What | Where | Valid until |
 |---|---|---|
-| Weather history (ERA5-Land, NASA POWER, Open-Meteo), CMIP6, SEAS5 | `data_cache/era5land/`, `nasa_power/`, `*.csv`, `cmip6/`, `seas5/` | Forever. Only new days or missing columns are downloaded |
+| Weather history (ERA5-Land, NASA POWER), CMIP6, SEAS5 | `data_cache/era5land/`, `nasa_power/`, `cmip6/`, `seas5/` | Forever. Only new days or missing columns are downloaded |
 | Climate indices (ENSO/NAO/PDO) | `data_cache/climate_indices.csv` | Re-downloaded after 3 days |
 | Soil (SoilGrids) | `data_cache/soil/*.json` | Forever (soil doesn't change) |
+| Pollution sources (OpenStreetMap) | `data_cache/pollution/*.json` | Forever (delete to refresh) |
+| Air quality (CAMS reanalysis summary per year) | `data_cache/cams/*.json` | Forever; `download_copernicus.py --only cams` adds a newer year |
 | **Finished forecasts** | `data_cache/forecasts/*.json` + memory (32 most recent) | **As long as nothing they depend on changes** |
 
 A forecast is only reused if all of these are unchanged:
@@ -341,7 +347,7 @@ A forecast is only reused if all of these are unchanged:
 - the inputs: climate models used, SEAS5 coverage, station calibration, latest climate-index month, Prophet on/off
 
 Files are written atomically, unreadable files are recomputed, and only the newest 2 entries per location are kept (about 220 KB each).
-Forecasts built with incomplete climate data (e.g. an Open-Meteo rate limit) are never cached.
+Forecasts built with incomplete climate data (some projection files unreadable) are never cached.
 
 Pre-compute forecasts, for example after the start of a month or before a demo:
 
@@ -382,7 +388,7 @@ backend/
 │   ├── nasa_power.py    NASA POWER history
 │   ├── cmip6.py         CMIP6 projections from Copernicus
 │   ├── et0.py           FAO-56 Penman-Monteith ET0
-│   ├── data.py          Open-Meteo history and projections (fallback), NOAA climate indices
+│   ├── data.py          shared daily columns, NOAA climate indices
 │   ├── seasonal.py      Copernicus SEAS5 download, parsing and bias correction
 │   ├── calibration.py   weather-station corrections
 │   ├── features.py      agricultural indicators and monthly aggregation
@@ -405,14 +411,12 @@ backend/
 
 | Environment variable | Default | Effect |
 |---|---|---|
-| `WEATHER_SOURCES` | `era5land,nasa_power,open_meteo` | Weather sources in fallback order |
-| `PROJECTION_SOURCES` | `cds_cmip6,open_meteo` | Projection sources in fallback order |
+| `WEATHER_SOURCES` | `era5land,nasa_power` | Weather sources in fallback order |
+| `PROJECTION_SOURCES` | `cds_cmip6` | Projection sources in fallback order |
 | `CDS_CMIP6_MODELS` | `mri_esm2_0,cnrm_cm6_1_hr,ipsl_cm6a_lr` | CMIP6 models from Copernicus |
 | `CDS_CMIP6_SCENARIO` | `ssp2_4_5` | CMIP6 scenario (e.g. `ssp5_8_5`) |
-| `OPEN_METEO_API_KEY` | unset | Use the commercial Open-Meteo endpoints (no free-tier limits) |
-| `CMIP_MODELS` | `EC_Earth3P_HR,MPI_ESM1_2_XR,MRI_AGCM3_2_S` | Open-Meteo climate models (fallback) |
 | `USE_PROPHET` | `1` | `0` leaves Meta Prophet out of the ensemble |
-| `CDSAPI_URL` / `CDSAPI_KEY` | from `~/.cdsapirc` | Copernicus credentials for SEAS5 |
+| `CDSAPI_URL` / `CDSAPI_KEY` | from `~/.cdsapirc` | Copernicus credentials (ERA5-Land, CMIP6, SEAS5; the key also for CAMS) |
 
 ---
 
@@ -431,7 +435,10 @@ backend/
 All sources (data, scientific methods, software) with full citations: **[QUELLEN.md](QUELLEN.md)**.
 
 
-- Weather and climate data by **[Open-Meteo.com](https://open-meteo.com/)** ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)), based on ERA5 / ERA5-Land (Copernicus Climate Change Service) and CMIP6 HighResMIP.
+- ERA5-Land and CMIP6: *Generated using Copernicus Climate Change Service information*.
+- NASA POWER: *These data were obtained from the NASA Langley Research Center (LaRC) POWER Project funded through the NASA Earth Science/Applied Science Program.*
+- Air quality: *Generated using Copernicus Atmosphere Monitoring Service information* (CAMS reanalysis EAC4).
+- Pollution sources: © OpenStreetMap contributors ([ODbL](https://opendatacommons.org/licenses/odbl/)).
 - SEAS5: *Generated using Copernicus Climate Change Service information*. Neither the European Commission nor ECMWF is responsible for any use of this information.
 - Climate indices: NOAA Climate Prediction Center and NCEI (public domain).
 - Soil: ISRIC SoilGrids 2.0 ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)), Poggio et al. (2021), *SOIL* 7, 217–240.
