@@ -78,6 +78,32 @@ def test_cams_netcdf_nearest_point_and_units(tmp_path):
     assert frame["pm25"].iloc[0] == pytest.approx(10.0)
 
 
+def test_download_reads_zip_of_gas_and_dust_files(tmp_path, monkeypatch):
+    import sys
+    import types
+    import zipfile
+
+    import xarray as xr
+
+    def fake_retrieve(self, dataset, request, target):
+        times = pd.date_range(f"{request['date'][0][:4]}-01-01", periods=8 * 365, freq="3h")
+        grid = {"valid_time": times, "latitude": [50.0], "longitude": [8.5]}
+        gases = xr.Dataset({v: (("valid_time", "model_level", "latitude", "longitude"), np.full((len(times), 1, 1, 1), 5e-8))
+                            for v in ("go3", "no2", "so2")}, coords={**grid, "model_level": [60]})
+        dust = xr.Dataset({"pm2p5": (("valid_time", "latitude", "longitude"), np.full((len(times), 1, 1), 1e-8))}, coords=grid)
+        gases.to_netcdf(tmp_path / "data_mlev.nc"), dust.to_netcdf(tmp_path / "data_sfc.nc")
+        with zipfile.ZipFile(target, "w") as archive:
+            archive.write(tmp_path / "data_mlev.nc", "data_mlev.nc"), archive.write(tmp_path / "data_sfc.nc", "data_sfc.nc")
+
+    fake = types.SimpleNamespace(Client=type("Client", (), {"__init__": lambda self, **kw: None, "retrieve": fake_retrieve}))
+    monkeypatch.setitem(sys.modules, "cdsapi", fake)
+    monkeypatch.setattr(pollution, "CAMS_DIR", tmp_path / "cams")
+    summary = pollution.download_air_quality(49.9, 8.6, year=2025)
+    assert summary["no2_mean_ug_m3"] == pytest.approx(5e-8 * 1.204e9, abs=0.1) and summary["pm25_mean_ug_m3"] == 10.0
+    assert pollution.read_air_quality(49.9, 8.6) == summary
+    assert [p.name for p in (tmp_path / "cams").iterdir()] == ["49.9_8.6_2025.json"]  # temp files cleaned up
+
+
 def test_air_quality_cache_returns_newest_year(tmp_path, monkeypatch):
     monkeypatch.setattr(pollution, "CAMS_DIR", tmp_path)
     assert pollution.read_air_quality(50, 8) is None

@@ -18,7 +18,10 @@ modelled air, not a measurement: at a 'caution' or 'avoid' site a soil test for 
 """
 import json
 import logging
+import tempfile
+import zipfile
 from datetime import date
+from pathlib import Path
 from typing import Dict, List, Optional
 
 import numpy as np
@@ -212,21 +215,27 @@ def download_air_quality(lat: float, lon: float, year: Optional[int] = None) -> 
     years = [year] if year else [date.today().year - 1, date.today().year - 2]
     errors = []
     for y in years:
-        target = CAMS_DIR / f".{round(lat, 2)}_{round(lon, 2)}_{y}.nc"
-        try:
-            client.retrieve(CAMS_DATASET, {
-                "variable": [*CAMS_GASES, CAMS_PM25[0]], "model_level": [SURFACE_MODEL_LEVEL],
-                "date": [f"{y}-01-01/{y}-12-31"], "time": [f"{h:02d}:00" for h in range(0, 24, 3)],
-                "area": [lat + 1, lon - 1, lat - 1, lon + 1], "data_format": "netcdf",
-            }, str(target))
-            summary = air_summary(_cams_frame(target, lat, lon), lon, y)
-            _cams_file(lat, lon, y).write_text(json.dumps(summary, indent=1))
-            return summary
-        except Exception as exc:
-            log.info("CAMS %s for %s,%s failed: %s", y, lat, lon, exc)
-            errors.append(f"{y}: {exc}")
-        finally:
-            target.unlink(missing_ok=True)
+        with tempfile.TemporaryDirectory(dir=CAMS_DIR) as tmp:
+            target = Path(tmp) / "download.nc"
+            try:
+                client.retrieve(CAMS_DATASET, {
+                    "variable": [*CAMS_GASES, CAMS_PM25[0]], "model_level": [SURFACE_MODEL_LEVEL],
+                    "date": [f"{y}-01-01/{y}-12-31"], "time": [f"{h:02d}:00" for h in range(0, 24, 3)],
+                    "area": [lat + 1, lon - 1, lat - 1, lon + 1], "data_format": "netcdf",
+                }, str(target))
+                paths = [target]
+                if zipfile.is_zipfile(target):  # gases (model level) and PM2.5 (surface) come as two netCDFs
+                    with zipfile.ZipFile(target) as archive:
+                        archive.extractall(tmp)
+                    paths = sorted(Path(tmp).glob("*.nc"))
+                    paths.remove(target)
+                frame = pd.concat([_cams_frame(path, lat, lon) for path in paths], axis=1)
+                summary = air_summary(frame, lon, y)
+                _cams_file(lat, lon, y).write_text(json.dumps(summary, indent=1))
+                return summary
+            except Exception as exc:
+                log.info("CAMS %s for %s,%s failed: %s", y, lat, lon, exc)
+                errors.append(f"{y}: {exc}")
     raise RuntimeError("CAMS download failed – " + "; ".join(errors))
 
 
