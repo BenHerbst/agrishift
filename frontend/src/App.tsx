@@ -12,6 +12,7 @@ import { LegalPage, type LegalRoute } from './components/LegalPage';
 import { CookieBanner } from './components/CookieBanner';
 import { computeMonthlyClimatology, PRESET_REGIONS } from './data/presets';
 import { useI18n } from './i18n/I18nContext';
+import { RefreshCw } from 'lucide-react';
 import {
   BASELINE_CROP_TEXT,
   MONTH_SHORT_BY_LANG,
@@ -88,7 +89,7 @@ export default function App() {
   const [dataset, setDataset] = useState<EarthSystemDataset | null>(null);
   const [isLoadingData, setIsLoadingData] = useState<boolean>(false);
 
-  // Terra Tuta forecast backend (ensemble forecast 1–3 years, agri summary, seasonal risk)
+  // AgriShift forecast backend (ensemble forecast 1–3 years, agri summary, seasonal risk)
   const [forecastDataset, setForecastDataset] = useState<ClimateForecastDataset | null>(null);
   const [forecastStatus, setForecastStatus] = useState<ForecastLoadStatus>('idle');
   const [forecastError, setForecastError] = useState<string | null>(null);
@@ -174,13 +175,13 @@ export default function App() {
   useEffect(() => {
     if (typeof document === 'undefined') return;
     if (legalRoute === '/impressum') {
-      document.title = `${t.legal.tabs.imprint} · Terra Tuta`;
+      document.title = `${t.legal.tabs.imprint} · AgriShift`;
     } else if (legalRoute === '/datenschutz') {
-      document.title = `${t.legal.tabs.privacy} · Terra Tuta`;
+      document.title = `${t.legal.tabs.privacy} · AgriShift`;
     } else if (legalRoute === '/cookies') {
-      document.title = `${t.legal.tabs.cookies} · Terra Tuta`;
+      document.title = `${t.legal.tabs.cookies} · AgriShift`;
     } else {
-      document.title = 'Terra Tuta';
+      document.title = 'AgriShift';
     }
   }, [legalRoute, t.legal.tabs.cookies, t.legal.tabs.imprint, t.legal.tabs.privacy]);
 
@@ -203,7 +204,9 @@ export default function App() {
       try {
         const result = fieldPolygon
           ? await fetchFieldAverageEarthSystemData(fieldPolygon, controller.signal)
-          : await fetchEarthSystemData(lat, lon, controller.signal, customLabel);
+          : await fetchEarthSystemData(lat, lon, controller.signal, customLabel, (soil) => {
+              if (!controller.signal.aborted) setDataset((d) => (d ? { ...d, soil } : d));
+            });
         if (!controller.signal.aborted) {
           setDataset(result);
           setAiBriefing(null);
@@ -737,6 +740,12 @@ export default function App() {
           />
 
           <main className="mx-auto w-full max-w-[1600px] flex-1 lg:min-h-0 border-x border-line bg-line flex flex-col gap-px">
+            {forecastStatus === 'loading' && (
+              <div role="status" className="flex items-center gap-2 bg-panel px-4 py-2 text-xs text-crop">
+                <RefreshCw className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden="true" />
+                {t.trends.ensembleLoading}
+              </div>
+            )}
             <GlobalTimelineBar
               stepIndex={clampedTimelineStep}
               maxStep={maxTimelineStep}

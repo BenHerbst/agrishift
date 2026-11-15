@@ -1,4 +1,4 @@
-# Terra Tuta – Backend: Agricultural Climate Forecasts
+# AgriShift – Backend: Agricultural Climate Forecasts
 
 A FastAPI service that forecasts **monthly farming-relevant weather 1–3 years ahead** for any location on Earth.
 It covers temperature, growing degree days, frost and heat days, rain, crop water demand, water balance and soil moisture.

@@ -227,7 +227,7 @@ export function localizeRegionName(
 
 export const UI_STRINGS = {
   en: {
-    documentTitle: 'Terra Tuta — Climate Trends & Crop Rotation Planner',
+    documentTitle: 'AgriShift — Climate Trends & Crop Rotation Planner',
     header: {
       navMap: 'Map',
       navTrends: 'Climate Trends',
@@ -254,7 +254,7 @@ export const UI_STRINGS = {
       stepBadge: 'Step 1 · Select a location',
       title: 'Check local climate shifts and plan matching crop rotations',
       subtitle:
-        'Enter any town, region, or GPS position. Terra Tuta pulls 36 years of NASA weather records alongside local soil data so you can inspect long-term trends and compare 3-year crop sequences.',
+        'Enter any town, region, or GPS position. AgriShift pulls 36 years of NASA weather records alongside local soil data so you can inspect long-term trends and compare 3-year crop sequences.',
       searchPlaceholder: 'Search town, region, or farm location (e.g., Aachen, Fresno, Seville)...',
       startBtn: 'Open site',
       currentLocationBtn: 'Use current location',
@@ -363,7 +363,7 @@ export const UI_STRINGS = {
     },
     trends: {
       kicker: 'NASA POWER 1990–2025 · 2026–2035 Outlook',
-      kickerEnsemble: 'NASA POWER 1990–2025 · Terra Tuta ensemble forecast 1–3 years',
+      kickerEnsemble: 'NASA POWER 1990–2025 · AgriShift ensemble forecast 1–3 years',
       title: 'Long-Term Trend & 10-Year Projection',
       modeHistorical: 'Measured (2000–2025)',
       modeEnsemble: 'Ensemble Forecast (1–3 yrs)',
@@ -461,7 +461,7 @@ export const UI_STRINGS = {
       inspectCalendar: 'Show 3-yr calendar',
     },
     forecast: {
-      kicker: 'Terra Tuta forecast ensemble',
+      kicker: 'AgriShift forecast ensemble',
       title: 'Seasonal Outlook 1–3 Years Ahead',
       subtitle:
         'Expected monthly conditions with an 80% range, not day-by-day weather. Every forecast is backtested against the plain 30-year average.',
@@ -558,7 +558,7 @@ export const UI_STRINGS = {
       errorFallback: 'Could not load the site summary.',
     },
     footer: {
-      left: '© 2026 Terra Tuta · Data: NASA POWER, NASA GIBS (MODIS, SMAP), ISRIC SoilGrids, NOAA, OpenStreetMap',
+      left: '© 2026 AgriShift · Data: NASA POWER, NASA GIBS (MODIS, SMAP), ISRIC SoilGrids, NOAA, OpenStreetMap',
       sources: 'All data sources',
       right: "Mann-Kendall · Sen's Slope · SSP5-8.5",
       imprint: 'Imprint',
@@ -577,13 +577,13 @@ export const UI_STRINGS = {
       },
     },
     cookieBanner: {
-      text: 'Privacy & Cookies: Terra Tuta uses no tracking or advertising cookies. Map, weather, and soil requests are sent to Mapbox, NASA POWER, and ISRIC (Hackathon prototype 2026).',
+      text: 'Privacy & Cookies: AgriShift uses no tracking or advertising cookies. Map, weather, and soil requests are sent to Mapbox, NASA POWER, and ISRIC (Hackathon prototype 2026).',
       learnMore: 'Cookie Notice',
       accept: 'Got it',
     },
   },
   de: {
-    documentTitle: 'Terra Tuta — Klimaverlauf & Fruchtfolgeplanung',
+    documentTitle: 'AgriShift — Klimaverlauf & Fruchtfolgeplanung',
     header: {
       navMap: 'Karte',
       navTrends: 'Klimaverlauf',
@@ -610,7 +610,7 @@ export const UI_STRINGS = {
       ],
       title: 'Lokale Klimatrends prüfen und passende Fruchtfolgen planen',
       subtitle:
-        'Geben Sie einen Ort, eine Region oder Ihren aktuellen Standort ein. Terra Tuta lädt 36 Jahre NASA-Wetterdaten sowie das lokale Bodenprofil und zeigt, wie sich Wärme und Bodenfeuchte verändern.',
+        'Geben Sie einen Ort, eine Region oder Ihren aktuellen Standort ein. AgriShift lädt 36 Jahre NASA-Wetterdaten sowie das lokale Bodenprofil und zeigt, wie sich Wärme und Bodenfeuchte verändern.',
       searchPlaceholder: 'Ort, Gemeinde oder Region suchen (z. B. Aachen, München, Sevilla)...',
       startBtn: 'Standort laden',
       currentLocationBtn: 'Aktuellen Standort nutzen',
@@ -719,7 +719,7 @@ export const UI_STRINGS = {
     },
     trends: {
       kicker: 'NASA POWER 1990–2025 · Ausblick 2026–2035',
-      kickerEnsemble: 'NASA POWER 1990–2025 · Terra-Tuta-Ensembleprognose 1–3 Jahre',
+      kickerEnsemble: 'NASA POWER 1990–2025 · AgriShift-Ensembleprognose 1–3 Jahre',
       title: 'Langzeittrend & 10-Jahres-Ausblick',
       modeHistorical: 'Messwerte (2000–2025)',
       modeEnsemble: 'Ensemble-Prognose (1–3 J.)',
@@ -817,7 +817,7 @@ export const UI_STRINGS = {
       inspectCalendar: 'Im Kalender ansehen',
     },
     forecast: {
-      kicker: 'Terra-Tuta-Prognose-Ensemble',
+      kicker: 'AgriShift-Prognose-Ensemble',
       title: 'Saisonaler Ausblick 1–3 Jahre voraus',
       subtitle:
         'Erwartete Monatswerte mit 80 %-Bereich, kein Tageswetter. Jede Prognose ist gegen das einfache 30-Jahres-Mittel getestet.',
@@ -914,7 +914,7 @@ export const UI_STRINGS = {
       errorFallback: 'Die Auswertung konnte nicht geladen werden.',
     },
     footer: {
-      left: '© 2026 Terra Tuta · Daten: NASA POWER, NASA GIBS (MODIS, SMAP), ISRIC SoilGrids, NOAA, OpenStreetMap',
+      left: '© 2026 AgriShift · Daten: NASA POWER, NASA GIBS (MODIS, SMAP), ISRIC SoilGrids, NOAA, OpenStreetMap',
       sources: 'Alle Datenquellen',
       right: 'Mann-Kendall · Sen-Steigung · SSP5-8.5',
       imprint: 'Impressum',
@@ -933,7 +933,7 @@ export const UI_STRINGS = {
       },
     },
     cookieBanner: {
-      text: 'Datenschutz- & Cookie-Hinweis: Terra Tuta setzt keine Werbe- oder Tracking-Cookies ein. Für Karten-, Wetter- und Bodenabrufe werden Anfragen an Mapbox, NASA POWER und ISRIC gesendet (Hackathon-Projekt 2026).',
+      text: 'Datenschutz- & Cookie-Hinweis: AgriShift setzt keine Werbe- oder Tracking-Cookies ein. Für Karten-, Wetter- und Bodenabrufe werden Anfragen an Mapbox, NASA POWER und ISRIC gesendet (Hackathon-Projekt 2026).',
       learnMore: 'Cookie-Erklärung',
       accept: 'Verstanden',
     },

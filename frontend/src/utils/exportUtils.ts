@@ -44,7 +44,7 @@ export function exportTimeSeriesCsv(
     ? `# Field Polygon Average: ${dataset.fieldAreaStats.areaHectares.toFixed(2)} ha | Perimeter: ${dataset.fieldAreaStats.perimeterMeters} m | Sample Points: ${dataset.fieldAreaStats.samplePointsCount}`
     : null;
   const lines = [
-    `# Terra Tuta Geospatial Telemetry Export`,
+    `# AgriShift Geospatial Telemetry Export`,
     `# Site: ${dataset.regionName}`,
     `# Coordinates (WGS84): ${dataset.lat.toFixed(4)}, ${dataset.lon.toFixed(4)}`,
     ...(fieldNote ? [fieldNote] : []),
@@ -69,7 +69,7 @@ export function exportTimeSeriesCsv(
   }
 
   triggerDownload(
-    `terratuta_${slug || 'site'}_${variable}_${mode}.csv`,
+    `agrishift_${slug || 'site'}_${variable}_${mode}.csv`,
     lines.join('\n'),
     'text/csv;charset=utf-8'
   );
@@ -146,7 +146,7 @@ export function exportSiteGeoJson(
   };
 
   triggerDownload(
-    `terratuta_${slug || 'site'}_${variable}.geojson`,
+    `agrishift_${slug || 'site'}_${variable}.geojson`,
     JSON.stringify(geojson, null, 2),
     'application/geo+json;charset=utf-8'
   );
@@ -207,8 +207,8 @@ export function exportSitePdfReport(params: {
   doc.setTextColor(20, 24, 30);
   writeWrapped(
     lang === 'de'
-      ? `Terra Tuta — Standort- & Klimabericht`
-      : `Terra Tuta — Site & Climate Report`,
+      ? `AgriShift — Standort- & Klimabericht`
+      : `AgriShift — Site & Climate Report`,
     16,
     7,
     true
@@ -351,5 +351,5 @@ export function exportSitePdfReport(params: {
     }
   }
 
-  doc.save(`terratuta_${slug || 'site'}_${selectedVariable}.pdf`);
+  doc.save(`agrishift_${slug || 'site'}_${selectedVariable}.pdf`);
 }

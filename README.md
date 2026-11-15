@@ -1,8 +1,8 @@
-# Terra Tuta
+# AgriShift
 
 Farm-site climate analysis: pick a location or draw a field, see 1990–2025 NASA POWER climate trends,
 ISRIC soil data, crop-rotation options, and a **1–3 year ensemble forecast with seasonal risk** from the
-Terra Tuta forecast backend.
+AgriShift forecast backend.
 
 ```
 frontend/   React + Vite app, served by an Express server (server.ts) on :3000

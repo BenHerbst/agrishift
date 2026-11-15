@@ -1,5 +1,5 @@
 /**
- * Client for the Terra Tuta forecast backend (FastAPI, ../backend).
+ * Client for the AgriShift forecast backend (FastAPI, ../backend).
  *
  * Requests go through the Express dev server (`/api/climate/*` → `BACKEND_URL/*`), so the
  * browser stays same-origin. Set VITE_CLIMATE_API_BASE to call the backend directly instead.

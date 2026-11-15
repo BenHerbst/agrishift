@@ -43,7 +43,7 @@ app = FastAPI(
     version="2.0.0",
 )
 
-# The Terra Tuta frontend talks to this API either through its own dev-server proxy (/api/climate/*)
+# The AgriShift frontend talks to this API either through its own dev-server proxy (/api/climate/*)
 # or directly from the browser. CORS_ORIGINS="https://a.example,https://b.example" restricts the
 # allowed origins; the default is open so the hackathon demo works from any host.
 app.add_middleware(

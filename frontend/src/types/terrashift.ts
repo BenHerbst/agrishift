@@ -221,7 +221,7 @@ export interface AgroBriefingResponse {
 }
 
 // ---------------------------------------------------------------------------
-// Terra Tuta forecast backend (FastAPI, ../backend): monthly ensemble forecast
+// AgriShift forecast backend (FastAPI, ../backend): monthly ensemble forecast
 // 1–3 years ahead, yearly agri indicators and seasonal risk probabilities.
 // ---------------------------------------------------------------------------
 

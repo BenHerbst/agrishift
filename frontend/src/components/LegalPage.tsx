@@ -33,7 +33,7 @@ export function LegalPage({ route, onNavigate }: LegalPageProps) {
               onClick={(e) => handleLinkClick(e, '/')}
               className="font-mono text-sm font-semibold tracking-wider text-ink whitespace-nowrap hover:text-crop transition-colors duration-200 ease-out"
             >
-              Terra Tuta
+              AgriShift
             </a>
             <span className="text-line" aria-hidden="true">
               |
@@ -54,7 +54,7 @@ export function LegalPage({ route, onNavigate }: LegalPageProps) {
       <main className="mx-auto w-full max-w-[880px] flex-1 px-4 sm:px-6 py-10 space-y-6">
         <div className="space-y-3 border-b border-line pb-5">
           <div className="font-mono text-xs text-crop">
-            Terra Tuta · {route}
+            AgriShift · {route}
           </div>
           <h1 className="text-2xl font-semibold tracking-tight text-ink">
             {pageHeading}
@@ -74,7 +74,7 @@ export function LegalPage({ route, onNavigate }: LegalPageProps) {
                       Angaben gemäß § 5 DDG (Hackathon-Projekt)
                     </h2>
                     <p>
-                      <strong className="text-ink">Terra Tuta</strong> (Projektteam / Hackathon-Prototyp 2026)
+                      <strong className="text-ink">AgriShift</strong> (Projektteam / Hackathon-Prototyp 2026)
                       <br />
                       Musterstraße 42
                       <br />
@@ -87,7 +87,7 @@ export function LegalPage({ route, onNavigate }: LegalPageProps) {
                   <section className="space-y-1.5">
                     <h2 className="text-base font-semibold text-ink">Kontakt</h2>
                     <p>
-                      E-Mail: kontakt@terra-tuta.example
+                      E-Mail: kontakt@agrishift.example
                       <br />
                       Telefon: +49 (0) 241 0000-2026
                       <br />
@@ -120,7 +120,7 @@ export function LegalPage({ route, onNavigate }: LegalPageProps) {
                       Imprint pursuant to § 5 DDG (Germany)
                     </h2>
                     <p>
-                      <strong className="text-ink">Terra Tuta</strong> (Hackathon Project Team 2026)
+                      <strong className="text-ink">AgriShift</strong> (Hackathon Project Team 2026)
                       <br />
                       Musterstraße 42
                       <br />
@@ -133,7 +133,7 @@ export function LegalPage({ route, onNavigate }: LegalPageProps) {
                   <section className="space-y-1.5">
                     <h2 className="text-base font-semibold text-ink">Contact</h2>
                     <p>
-                      Email: kontakt@terra-tuta.example
+                      Email: kontakt@agrishift.example
                       <br />
                       Phone: +49 (0) 241 0000-2026
                       <br />
@@ -173,7 +173,7 @@ export function LegalPage({ route, onNavigate }: LegalPageProps) {
                     </h2>
                     <p>
                       Verantwortlich im Sinne der DSGVO ist das Projektteam{' '}
-                      <strong className="text-ink">Terra Tuta</strong>, Musterstraße 42, 52062 Aachen, Deutschland (kontakt@terra-tuta.example).
+                      <strong className="text-ink">AgriShift</strong>, Musterstraße 42, 52062 Aachen, Deutschland (kontakt@agrishift.example).
                     </p>
                   </section>
 
@@ -182,7 +182,7 @@ export function LegalPage({ route, onNavigate }: LegalPageProps) {
                       1. Standortwahl, Suche &amp; optionale Ortung
                     </h2>
                     <p>
-                      Terra Tuta benötigt kein Benutzerkonto. Wenn Sie einen Ort suchen, Koordinaten eingeben oder auf „Aktuellen Standort nutzen“ klicken, werden die Koordinaten ausschließlich zum Abruf der zugehörigen Klima-, Boden- und Kartendaten verarbeitet. Eine Browser-Standortabfrage erfolgt erst nach Ihrer aktiven Browser-Freigabe.
+                      AgriShift benötigt kein Benutzerkonto. Wenn Sie einen Ort suchen, Koordinaten eingeben oder auf „Aktuellen Standort nutzen“ klicken, werden die Koordinaten ausschließlich zum Abruf der zugehörigen Klima-, Boden- und Kartendaten verarbeitet. Eine Browser-Standortabfrage erfolgt erst nach Ihrer aktiven Browser-Freigabe.
                     </p>
                   </section>
 
@@ -211,7 +211,7 @@ export function LegalPage({ route, onNavigate }: LegalPageProps) {
                       3. Ihre Rechte nach DSGVO
                     </h2>
                     <p>
-                      Sie haben das Recht auf Auskunft (Art. 15), Berichtigung (Art. 16), Löschung (Art. 17), Einschränkung der Verarbeitung (Art. 18) sowie Widerspruch (Art. 21 DSGVO). Da Terra Tuta keine Nutzerprofile speichert, lassen sich lokale Einstellungen jederzeit über das Löschen des Browser-Speichers entfernen.
+                      Sie haben das Recht auf Auskunft (Art. 15), Berichtigung (Art. 16), Löschung (Art. 17), Einschränkung der Verarbeitung (Art. 18) sowie Widerspruch (Art. 21 DSGVO). Da AgriShift keine Nutzerprofile speichert, lassen sich lokale Einstellungen jederzeit über das Löschen des Browser-Speichers entfernen.
                     </p>
                   </section>
                 </>
@@ -223,7 +223,7 @@ export function LegalPage({ route, onNavigate }: LegalPageProps) {
                     </h2>
                     <p>
                       Controller within the meaning of the GDPR is{' '}
-                      <strong className="text-ink">Terra Tuta</strong>, Musterstraße 42, 52062 Aachen, Germany (kontakt@terra-tuta.example).
+                      <strong className="text-ink">AgriShift</strong>, Musterstraße 42, 52062 Aachen, Germany (kontakt@agrishift.example).
                     </p>
                   </section>
 
@@ -232,7 +232,7 @@ export function LegalPage({ route, onNavigate }: LegalPageProps) {
                       1. Location Search &amp; Geolocation
                     </h2>
                     <p>
-                      Terra Tuta requires no user account or sign-up. Place queries, manual coordinates, or optional browser geolocation (only triggered when you click “Use current location” and grant permission) are used solely to retrieve weather, soil, and map data for the selected coordinates.
+                      AgriShift requires no user account or sign-up. Place queries, manual coordinates, or optional browser geolocation (only triggered when you click “Use current location” and grant permission) are used solely to retrieve weather, soil, and map data for the selected coordinates.
                     </p>
                   </section>
 
@@ -261,7 +261,7 @@ export function LegalPage({ route, onNavigate }: LegalPageProps) {
                       3. Your GDPR Rights
                     </h2>
                     <p>
-                      You have the right to access (Art. 15), rectify (Art. 16), erase (Art. 17), restrict (Art. 18), and object to processing (Art. 21 GDPR). Because Terra Tuta stores no backend user profiles, clearing browser storage removes all local state.
+                      You have the right to access (Art. 15), rectify (Art. 16), erase (Art. 17), restrict (Art. 18), and object to processing (Art. 21 GDPR). Because AgriShift stores no backend user profiles, clearing browser storage removes all local state.
                     </p>
                   </section>
                 </>
@@ -278,7 +278,7 @@ export function LegalPage({ route, onNavigate }: LegalPageProps) {
                       Keine Werbe- oder Tracking-Cookies (§ 25 TDDDG)
                     </h2>
                     <p>
-                      Terra Tuta setzt <strong className="text-ink">keine Werbe-, Analyse- oder Tracking-Cookies</strong> ein. Es findet kein nutzerübergreifendes Tracking statt.
+                      AgriShift setzt <strong className="text-ink">keine Werbe-, Analyse- oder Tracking-Cookies</strong> ein. Es findet kein nutzerübergreifendes Tracking statt.
                     </p>
                   </section>
 
@@ -316,7 +316,7 @@ export function LegalPage({ route, onNavigate }: LegalPageProps) {
                       No Advertising or Tracking Cookies (§ 25 TDDDG)
                     </h2>
                     <p>
-                      Terra Tuta sets <strong className="text-ink">no advertising, analytics, or cross-site tracking cookies</strong>.
+                      AgriShift sets <strong className="text-ink">no advertising, analytics, or cross-site tracking cookies</strong>.
                     </p>
                   </section>
 

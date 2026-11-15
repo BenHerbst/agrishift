@@ -82,7 +82,7 @@ const MAPBOX_TOKEN =
 
 const SATELLITE_STYLE: mapboxgl.StyleSpecification = {
   version: 8,
-  name: 'Terra Tuta Satellite',
+  name: 'AgriShift Satellite',
   glyphs: 'mapbox://fonts/mapbox/{fontstack}/{range}.pbf',
   sources: {
     'esri-imagery': {
@@ -479,6 +479,9 @@ export function GeospatialMap({
     pending: null as { layer: number; duration: number } | null,
     lastChange: 0,
     fadeTimer: 0 as ReturnType<typeof setTimeout> | 0,
+    layerId: '',
+    shown: new Map<string, number>(),
+    raf: 0,
   });
 
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -838,6 +841,7 @@ export function GeospatialMap({
     if (!pending) return;
     h.pending = null;
     clearTimeout(h.fadeTimer);
+    h.fadeTimer = 0;
     HEAT_LAYER_IDS.forEach((layerId, i) => {
       if (!map.getLayer(layerId)) return;
       map.setPaintProperty(layerId, 'heatmap-opacity-transition', { duration: pending.duration, delay: 0 });
@@ -846,13 +850,66 @@ export function GeospatialMap({
     h.front = pending.layer;
   };
 
-  /** Loads a frame into the hidden layer, then cross-fades to it once its tiles are ready. */
-  const pushHeatFrame = (map: mapboxgl.Map, data: GeoJsonData, color: mapboxgl.ExpressionSpecification) => {
+  const heatWeightMap = (data: GeoJsonData) =>
+    new Map(
+      (data as { features: Array<{ geometry: { coordinates: number[] }; properties: { w: number } }> }).features.map(
+        (f) => [f.geometry.coordinates.join(','), f.properties.w] as [string, number]
+      )
+    );
+
+  /** Glides every grid point's weight from what is shown now to the new frame (no cut, no dip). */
+  const tweenHeatFrame = (map: mapboxgl.Map, data: GeoJsonData) => {
     const h = heatRef.current;
+    const now = performance.now();
+    const duration = clamp(now - h.lastChange, 400, 1200);
+    h.lastChange = now;
+    const target = heatWeightMap(data);
+    h.data[h.front] = data;
+    const from = new Map(h.shown);
+    const features = (data as { features: Array<{ type: 'Feature'; geometry: unknown; properties: { w: number } }> }).features;
+    cancelAnimationFrame(h.raf);
+    const step = (t: number) => {
+      const k = clamp((t - now) / duration, 0, 1);
+      const e = k * k * (3 - 2 * k); // smoothstep
+      const shown = new Map<string, number>();
+      const frame = features.map((f) => {
+        const key = (f.geometry as { coordinates: number[] }).coordinates.join(',');
+        const b = target.get(key) ?? 0;
+        const w = (from.get(key) ?? b) + (b - (from.get(key) ?? b)) * e;
+        shown.set(key, w);
+        return { ...f, properties: { w } };
+      });
+      h.shown = shown;
+      (map.getSource(HEAT_SOURCE_IDS[h.front]) as mapboxgl.GeoJSONSource | undefined)?.setData({
+        type: 'FeatureCollection',
+        features: frame,
+      } as GeoJsonData);
+      if (k < 1) h.raf = requestAnimationFrame(step);
+    };
+    h.raf = requestAnimationFrame(step);
+  };
+
+  /** Loads a frame into the hidden layer, then cross-fades to it once its tiles are ready. */
+  const pushHeatFrame = (
+    map: mapboxgl.Map,
+    data: GeoJsonData,
+    color: mapboxgl.ExpressionSpecification,
+    layerId: string
+  ) => {
+    const h = heatRef.current;
+    const sameLayer = h.visible && !h.pending && h.layerId === layerId && h.shown.size > 0;
+    h.layerId = layerId;
+    if (sameLayer) {
+      (map.getSource('heat-cells-source') as mapboxgl.GeoJSONSource | undefined)?.setData(h.cells);
+      tweenHeatFrame(map, data);
+      return;
+    }
+    cancelAnimationFrame(h.raf);
+    h.shown = heatWeightMap(data);
     const back = 1 - h.front;
     const now = performance.now();
     // Fast timeline playback gets short fades; single slider steps get a slow, smooth blend
-    const duration = Math.round(clamp((now - h.lastChange) * 0.9, 90, 650));
+    const duration = Math.round(clamp((now - h.lastChange) * 0.9, 170, 650));
     h.lastChange = now;
     h.data[back] = data;
     h.color[back] = color;
@@ -867,15 +924,18 @@ export function GeospatialMap({
     source.setData(data);
     map.setPaintProperty(HEAT_LAYER_IDS[back], 'heatmap-color', color);
     h.pending = { layer: back, duration };
-    clearTimeout(h.fadeTimer);
-    h.fadeTimer = setTimeout(() => runHeatFade(map), 160);
+    // Throttle, not debounce: a debounce never fires while the timeline plays, so the map froze until the end
+    if (!h.fadeTimer) h.fadeTimer = setTimeout(() => runHeatFade(map), 160);
   };
 
   const hideHeat = (map: mapboxgl.Map) => {
     const h = heatRef.current;
     h.visible = false;
     h.pending = null;
+    cancelAnimationFrame(h.raf);
+    h.shown = new Map();
     clearTimeout(h.fadeTimer);
+    h.fadeTimer = 0;
     if (map.getLayer('heat-cells')) map.setLayoutProperty('heat-cells', 'visibility', 'none');
     HEAT_LAYER_IDS.forEach((layerId) => {
       if (!map.getLayer(layerId)) return;
@@ -1200,7 +1260,7 @@ export function GeospatialMap({
     ensureHeatLayers(map);
     heatRef.current.cells = buildHeatCellGeoJson(heatGrid, heatFrame);
     heatRef.current.cellColor = cellColorExpression(heatGrid.layer.colors);
-    pushHeatFrame(map, buildHeatGeoJson(heatGrid, heatFrame), heatColorExpression(heatGrid.layer.colors));
+    pushHeatFrame(map, buildHeatGeoJson(heatGrid, heatFrame), heatColorExpression(heatGrid.layer.colors), heatGrid.layer.id);
   }, [heatFrame, styleRevision]);
 
   // NASA GIBS image for the middle month of the timeline period (July for a whole year)

@@ -16,7 +16,7 @@ interface DataSourcesPanelProps {
 const COPY = {
   de: {
     title: 'Daten & APIs',
-    intro: 'Jede Zahl in Terra Tuta stammt aus einer offenen Datenquelle. Hier steht, welche Anfrage für diesen Standort gestellt wurde.',
+    intro: 'Jede Zahl in AgriShift stammt aus einer offenen Datenquelle. Hier steht, welche Anfrage für diesen Standort gestellt wurde.',
     close: 'Schließen',
     live: 'Live',
     fallback: 'Ersatzwerte',
@@ -43,7 +43,7 @@ const COPY = {
   },
   en: {
     title: 'Data & APIs',
-    intro: 'Every number in Terra Tuta comes from an open data source. This lists the requests made for this site.',
+    intro: 'Every number in AgriShift comes from an open data source. This lists the requests made for this site.',
     close: 'Close',
     live: 'Live',
     fallback: 'Estimated',

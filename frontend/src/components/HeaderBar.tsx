@@ -26,7 +26,7 @@ export function Wordmark() {
         <path d="M5 16c3-5 5-8 7-9M9 18c2.5-4.5 5-8 9-10M14 18.5c1.5-2.5 3-4.5 5-5.5" stroke="var(--color-rapeseed)" strokeWidth="2" fill="none" strokeLinecap="round" />
       </svg>
       <span className="text-[17px] font-extrabold leading-none tracking-tight" style={{ fontStretch: '125%' }}>
-        Terra Tuta
+        AgriShift
       </span>
     </span>
   );

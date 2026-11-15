@@ -184,7 +184,7 @@ async function soilFromBackend(lat: number, lon: number, start: number, signal?:
   try {
     const res = await fetchWithTimeout(
       `${(import.meta.env?.VITE_CLIMATE_API_BASE as string | undefined)?.replace(/\/+$/, '') ?? '/api/climate'}/soil?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}`,
-      SOIL_TIMEOUT_MS * 2,
+      120000,
       signal
     );
     if (!res.ok) return null;
@@ -216,6 +216,10 @@ async function fetchSoilGrids(
 ): Promise<SoilProfile> {
   const start = performance.now();
   const url = soilGridsUrl(lat, lon);
+
+  // The SoilGrids REST API is unreliable; the backend (WCS, cached per site) is the primary source.
+  const fromBackend = await soilFromBackend(lat, lon, start, signal);
+  if (fromBackend) return fromBackend;
 
   try {
     const res = await fetchWithTimeout(cached(url), SOIL_TIMEOUT_MS, signal);
@@ -339,14 +343,18 @@ export async function fetchEarthSystemData(
   lat: number,
   lon: number,
   signal?: AbortSignal,
-  customRegionLabel?: string
+  customRegionLabel?: string,
+  onSoilUpdate?: (soil: SoilProfile) => void
 ): Promise<EarthSystemDataset> {
   const fallback = generateFallbackSeries(lat, lon);
 
-  const [powerResult, soilResult] = await Promise.all([
-    fetchNasaPower(lat, lon, fallback.recordsByVariable, signal),
-    fetchSoilGrids(lat, lon, fallback.soil, signal),
-  ]);
+  // A new site's soil can take a minute on the backend: show the climate first, patch soil in later.
+  const soilPromise = fetchSoilGrids(lat, lon, fallback.soil, signal);
+  const powerResult = await fetchNasaPower(lat, lon, fallback.recordsByVariable, signal);
+  const pending = Symbol();
+  const early = await Promise.race([soilPromise, new Promise<typeof pending>((r) => setTimeout(() => r(pending), 3000))]);
+  const soilResult = early === pending ? fallback.soil : early;
+  if (early === pending && onSoilUpdate) soilPromise.then(onSoilUpdate);
 
   const { climatology, peakHeatMonths, moistureDeficitMonths } = computeMonthlyClimatology(
     powerResult.recordsByVariable

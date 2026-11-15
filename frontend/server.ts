@@ -13,7 +13,7 @@ const __dirname = path.dirname(__filename);
 
 const PORT = Number(process.env.PORT ?? 3000);
 
-// Terra Tuta forecast backend (FastAPI, ../backend). The browser never talks to it directly:
+// AgriShift forecast backend (FastAPI, ../backend). The browser never talks to it directly:
 // every /api/climate/* request is forwarded here so the app stays same-origin.
 const BACKEND_URL = (process.env.BACKEND_URL ?? 'http://127.0.0.1:8000').replace(/\/+$/, '');
 // The first request for a new location downloads ~45 years of data and trains all models (1–2 min).
@@ -276,7 +276,7 @@ async function startServer() {
     }
     try {
       const upstream = await fetch(upstreamUrl, {
-        headers: { accept: 'application/json', 'user-agent': 'TerraTuta/1.0 (farm climate analysis)' },
+        headers: { accept: 'application/json', 'user-agent': 'AgriShift/1.0 (farm climate analysis)' },
         signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
       });
       const body = await upstream.text();
@@ -337,7 +337,7 @@ async function startServer() {
   }
 
   httpServer.listen(PORT, '0.0.0.0', () => {
-    console.log(`Terra Tuta server listening on http://0.0.0.0:${PORT}`);
+    console.log(`AgriShift server listening on http://0.0.0.0:${PORT}`);
   });
 }
 
