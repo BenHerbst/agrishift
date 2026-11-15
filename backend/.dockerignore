@@ -1,0 +1,7 @@
+.venv
+data_cache
+__pycache__
+.env
+.cdsapirc
+tests
+outputs
