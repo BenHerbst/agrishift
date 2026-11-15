@@ -7,6 +7,8 @@ services:
       - backend_cache:/app/data_cache
   frontend:
     build: ./frontend
+    expose:
+      - "3000"
     restart: unless-stopped
     environment:
       BACKEND_URL: http://backend:8000
