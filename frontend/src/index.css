@@ -1,21 +1,68 @@
 @import "tailwindcss";
 
 @theme {
-  --font-display: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* One family; the width axis does the display work (expanded like a grain-sack print) */
+  --font-display: "Archivo", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Archivo", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Archivo", ui-sans-serif, system-ui, sans-serif;
+
+  /* Field survey sheet: lichen paper, spruce ink, crop green, ochre for dry/forecast */
+  --color-ground: #ECEFE6;
+  --color-panel: #F9FAF5;
+  --color-raised: #E2E8DA;
+  --color-line: #CDD4C4;
+  --color-line-strong: #A3AE99;
+  --color-ink: #1C261F;
+  --color-ink-2: #4A564C;
+  --color-ink-3: #66726A;
+  --color-crop: #2F6B3C;
+  --color-warn: #A0561A;
+  --color-water: #2F6A8A;
+  --color-rapeseed: #E3B92B;
+}
+
+/* Optional dark theme: night over the field, same hues lifted for contrast */
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --color-ground: #141915;
+  --color-panel: #1A201B;
+  --color-raised: #262E27;
+  --color-line: #313A32;
+  --color-line-strong: #4A5649;
+  --color-ink: #E5EBE0;
+  --color-ink-2: #AEB8AB;
+  --color-ink-3: #8C9789;
+  --color-crop: #86C27F;
+  --color-warn: #DDA05C;
+  --color-water: #74AFD0;
+}
+
+html[data-theme="dark"] .mapboxgl-ctrl-group button .mapboxgl-ctrl-icon {
+  filter: invert(0.9);
 }
 
 @layer base {
   html {
     scroll-behavior: smooth;
     font-family: var(--font-sans);
-    background-color: #111316;
-    color: #eceef0;
+    background-color: var(--color-ground);
+    color: var(--color-ink);
   }
 
   h1, h2, h3, h4 {
     font-family: var(--font-display);
+    font-stretch: 118%;
+    letter-spacing: -0.005em;
+  }
+
+  /* Former monospace data labels: same family, tabular figures so numbers line up */
+  .font-mono {
+    font-variant-numeric: tabular-nums;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-crop);
+    outline-offset: 2px;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -30,54 +77,69 @@
   }
 }
 
-/* Mapbox GL dark anthracite theme integration */
 .mapboxgl-map {
-  font-family: var(--font-mono);
-  background: #111316;
+  font-family: var(--font-sans);
+  background: var(--color-ground);
   isolation: isolate;
 }
 
 .mapboxgl-ctrl-group {
-  background-color: #171a1f !important;
-  border: 1px solid #262b33 !important;
-  border-radius: 2px !important;
-  box-shadow: none !important;
+  background-color: var(--color-panel) !important;
+  border: 1px solid var(--color-line) !important;
+  border-radius: 6px !important;
+  box-shadow: 0 1px 2px rgba(28, 38, 31, 0.12) !important;
 }
 
 .mapboxgl-ctrl-group button {
-  background-color: #171a1f !important;
-  border-color: #262b33 !important;
+  background-color: transparent !important;
+  border-color: var(--color-line) !important;
   transition: background-color 0.2s ease;
 }
 
 .mapboxgl-ctrl-group button:hover {
-  background-color: #262b33 !important;
-}
-
-.mapboxgl-ctrl-group button .mapboxgl-ctrl-icon {
-  filter: invert(0.88);
+  background-color: var(--color-raised) !important;
 }
 
 .mapboxgl-ctrl-attrib {
-  background: rgba(17, 19, 22, 0.88) !important;
-  color: #7c8490 !important;
+  background: color-mix(in srgb, var(--color-panel) 85%, transparent) !important;
+  color: var(--color-ink-3) !important;
   font-size: 9px !important;
-  font-family: var(--font-mono) !important;
-  border-radius: 0 !important;
+  border-radius: 4px 0 0 0 !important;
 }
 
 .mapboxgl-ctrl-attrib a {
-  color: #a1a8b3 !important;
+  color: var(--color-ink-2) !important;
 }
 
-.mapboxgl-ctrl-attrib-button {
-  background-color: #171a1f !important;
-  filter: invert(0.8);
+/* Timeline slider sits on the climate stripes: invisible track, a tall ink needle as thumb */
+.timeline-range {
+  appearance: none;
+  background: transparent;
 }
+.timeline-range::-webkit-slider-runnable-track { height: 100%; background: transparent; }
+.timeline-range::-moz-range-track { height: 100%; background: transparent; }
+.timeline-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 6px;
+  height: 52px;
+  margin-top: -4px;
+  border-radius: 3px;
+  background: var(--color-ink);
+  box-shadow: 0 0 0 2px var(--color-panel);
+}
+.timeline-range::-moz-range-thumb {
+  width: 6px;
+  height: 52px;
+  border: none;
+  border-radius: 3px;
+  background: var(--color-ink);
+  box-shadow: 0 0 0 2px var(--color-panel);
+}
+.timeline-range:focus-visible { outline-offset: 4px; }
 
 /* Range Input Calibration */
 input[type="range"] {
-  accent-color: #10b981;
+  accent-color: var(--color-crop);
 }
 
 /* Map climate-layer legend: slide in when a layer is switched on, soft tick on every month change */

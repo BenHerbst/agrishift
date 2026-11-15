@@ -6,6 +6,7 @@ import {
   LocateFixed,
   MapPin,
   Search,
+  Trash2,
 } from 'lucide-react';
 import { PRESET_REGIONS } from '../data/presets';
 import { LanguageSwitcher, useI18n } from '../i18n/I18nContext';
@@ -17,6 +18,9 @@ import {
 } from '../services/geocodingService';
 import type { PresetRegion } from '../types/terrashift';
 import type { LegalRoute } from './LegalPage';
+import { ThemeToggle, Wordmark } from './HeaderBar';
+import { FieldGlyph, savedFieldMeta } from './SavedFieldsMenu';
+import { useSavedFields, type SavedField } from '../services/savedFieldsService';
 
 interface LocationOnboardingProps {
   onConfirmLocation: (selection: {
@@ -25,14 +29,17 @@ interface LocationOnboardingProps {
     label?: string;
     preset?: PresetRegion;
   }) => void;
+  onLoadSaved: (field: SavedField) => void;
   onNavigateLegal: (path: LegalRoute) => void;
 }
 
 export function LocationOnboarding({
   onConfirmLocation,
+  onLoadSaved,
   onNavigateLegal,
 }: LocationOnboardingProps) {
   const { lang, t } = useI18n();
+  const { fields: savedFields, remove: removeSaved } = useSavedFields();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<GeocodingResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -142,16 +149,15 @@ export function LocationOnboarding({
   };
 
   return (
-    <div className="min-h-screen bg-[#111316] text-[#ECEEF0] flex flex-col">
-      <header className="border-b border-[#262B33] bg-[#111316]">
+    <div className="min-h-screen bg-ground text-ink flex flex-col">
+      <header className="border-b border-line bg-ground">
         <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-6 px-4 sm:px-6 py-3.5">
-          <span className="font-mono text-sm font-semibold tracking-wider text-[#ECEEF0] whitespace-nowrap">
-            Terra Tuta
-          </span>
+          <Wordmark />
           <div className="flex items-center gap-5">
-            <span className="font-mono text-[11px] text-[#7C8490] hidden md:inline">
+            <span className="font-mono text-[11px] text-ink-3 hidden md:inline">
               {t.onboarding.tagline}
             </span>
+            <ThemeToggle />
             <LanguageSwitcher />
           </div>
         </div>
@@ -162,18 +168,18 @@ export function LocationOnboarding({
           {/* Left 7 Columns: Editorial Briefing + Direct Search */}
           <div className="lg:col-span-7 space-y-6">
             <div className="space-y-3">
-              <div className="font-mono text-xs text-emerald-400">
+              <div className="font-mono text-xs text-crop">
                 {t.onboarding.stepBadge}
               </div>
-              <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-[#ECEEF0] leading-snug">
+              <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-ink leading-snug">
                 {t.onboarding.title}
               </h1>
-              <p className="max-w-2xl text-sm leading-relaxed text-[#A1A8B3]">
+              <p className="max-w-2xl text-sm leading-relaxed text-ink-2">
                 {t.onboarding.subtitle}
               </p>
             </div>
 
-            <div className="border border-[#262B33] bg-[#171A1F] p-5 sm:p-6 space-y-4">
+            <div className="border border-line bg-panel p-5 sm:p-6 space-y-4">
               <div className="flex flex-col gap-3">
                 <form onSubmit={handleSearchSubmit} className="relative flex flex-col sm:flex-row gap-2">
                   <label htmlFor="onboarding-place-search" className="sr-only">
@@ -181,7 +187,7 @@ export function LocationOnboarding({
                   </label>
                   <div className="relative flex-1 flex items-center">
                     <Search
-                      className="pointer-events-none absolute left-3 h-4 w-4 text-[#7C8490]"
+                      className="pointer-events-none absolute left-3 h-4 w-4 text-ink-3"
                       aria-hidden="true"
                     />
                     <input
@@ -193,7 +199,7 @@ export function LocationOnboarding({
                         setGeoError(null);
                       }}
                       placeholder={t.onboarding.searchPlaceholder}
-                      className="w-full rounded-[2px] border border-[#262B33] bg-[#111316] py-2.5 pl-9 pr-3 text-xs sm:text-sm text-[#ECEEF0] placeholder:text-[#7C8490] focus:border-emerald-500 focus:outline-none transition-colors duration-200 ease-out"
+                      className="w-full rounded-md border border-line bg-ground py-2.5 pl-9 pr-3 text-xs sm:text-sm text-ink placeholder:text-ink-3 focus:border-crop focus:outline-none transition-colors duration-200 ease-out"
                       autoFocus
                     />
                   </div>
@@ -202,7 +208,7 @@ export function LocationOnboarding({
                     <button
                       type="submit"
                       disabled={isSearching || query.trim().length < 2}
-                      className="inline-flex items-center justify-center gap-1.5 rounded-[2px] bg-emerald-500 px-3.5 py-2.5 text-xs font-medium text-[#111316] hover:bg-emerald-400 disabled:opacity-40 transition-colors duration-200 ease-out cursor-pointer whitespace-nowrap"
+                      className="inline-flex items-center justify-center gap-1.5 rounded-md bg-crop px-3.5 py-2.5 text-xs font-medium text-ground hover:bg-crop/90 disabled:opacity-40 transition-colors duration-200 ease-out cursor-pointer whitespace-nowrap"
                     >
                       {isSearching ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
@@ -218,19 +224,19 @@ export function LocationOnboarding({
                       type="button"
                       onClick={handleUseCurrentLocation}
                       disabled={isLocating}
-                      className="inline-flex items-center justify-center gap-2 rounded-[2px] border border-[#262B33] bg-[#111316] px-3.5 py-2.5 text-xs font-medium text-[#ECEEF0] hover:border-emerald-500/60 hover:text-emerald-300 transition-colors duration-200 ease-out whitespace-nowrap shrink-0 cursor-pointer disabled:opacity-60"
+                      className="inline-flex items-center justify-center gap-2 rounded-md border border-line bg-ground px-3.5 py-2.5 text-xs font-medium text-ink hover:border-crop/60 hover:text-crop transition-colors duration-200 ease-out whitespace-nowrap shrink-0 cursor-pointer disabled:opacity-60"
                     >
                       {isLocating ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
                       ) : (
-                        <LocateFixed className="h-3.5 w-3.5 text-emerald-400" aria-hidden="true" />
+                        <LocateFixed className="h-3.5 w-3.5 text-crop" aria-hidden="true" />
                       )}
                       <span>{isLocating ? t.onboarding.locatingBtn : t.onboarding.currentLocationBtn}</span>
                     </button>
                   </div>
 
                   {results.length > 0 && (
-                    <div className="absolute left-0 right-0 top-full z-30 mt-1.5 border border-[#262B33] bg-[#111316] divide-y divide-[#262B33] max-h-60 overflow-y-auto">
+                    <div className="absolute left-0 right-0 top-full z-30 mt-1.5 border border-line bg-ground divide-y divide-line max-h-60 overflow-y-auto">
                       {results.map((item) => (
                         <button
                           key={item.id}
@@ -242,13 +248,13 @@ export function LocationOnboarding({
                               label: item.displayLabel,
                             })
                           }
-                          className="flex w-full items-center justify-between gap-4 px-3.5 py-2.5 text-left text-xs hover:bg-[#1E2229] transition-colors duration-200 ease-out cursor-pointer"
+                          className="flex w-full items-center justify-between gap-4 px-3.5 py-2.5 text-left text-xs hover:bg-raised transition-colors duration-200 ease-out cursor-pointer"
                         >
-                          <span className="flex items-center gap-2 text-[#ECEEF0] min-w-0">
-                            <MapPin className="h-3.5 w-3.5 text-emerald-400 shrink-0" aria-hidden="true" />
+                          <span className="flex items-center gap-2 text-ink min-w-0">
+                            <MapPin className="h-3.5 w-3.5 text-crop shrink-0" aria-hidden="true" />
                             <span className="truncate">{item.displayLabel}</span>
                           </span>
-                          <span className="font-mono text-[11px] tabular-nums tracking-tight text-[#A1A8B3] shrink-0">
+                          <span className="font-mono text-[11px] tabular-nums tracking-tight text-ink-2 shrink-0">
                             {item.lat.toFixed(4)}, {item.lon.toFixed(4)}
                           </span>
                         </button>
@@ -259,19 +265,19 @@ export function LocationOnboarding({
               </div>
 
               {geoError && (
-                <div className="rounded-[2px] border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+                <div className="rounded-md border border-warn/40 bg-warn/10 px-3 py-2 text-xs text-warn">
                   {geoError}
                 </div>
               )}
 
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#262B33] pt-3.5 text-xs text-[#A1A8B3]">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3.5 text-xs text-ink-2">
                 <span>{t.onboarding.coordPrompt}</span>
                 <button
                   type="button"
                   onClick={() => setShowCoordEntry((prev) => !prev)}
-                  className="inline-flex items-center gap-1.5 font-medium text-[#ECEEF0] hover:text-emerald-300 transition-colors duration-200 ease-out cursor-pointer"
+                  className="inline-flex items-center gap-1.5 font-medium text-ink hover:text-crop transition-colors duration-200 ease-out cursor-pointer"
                 >
-                  <Compass className="h-3.5 w-3.5 text-[#A1A8B3]" aria-hidden="true" />
+                  <Compass className="h-3.5 w-3.5 text-ink-2" aria-hidden="true" />
                   <span>{showCoordEntry ? t.onboarding.coordHide : t.onboarding.coordShow}</span>
                 </button>
               </div>
@@ -279,10 +285,10 @@ export function LocationOnboarding({
               {showCoordEntry && (
                 <form
                   onSubmit={handleCoordSubmit}
-                  className="flex flex-wrap items-center gap-3 border border-[#262B33] bg-[#111316] p-3"
+                  className="flex flex-wrap items-center gap-3 border border-line bg-ground p-3"
                 >
                   <div className="flex items-center gap-2">
-                    <label htmlFor="onboard-lat" className="font-mono text-xs text-[#A1A8B3]">
+                    <label htmlFor="onboard-lat" className="font-mono text-xs text-ink-2">
                       Lat:
                     </label>
                     <input
@@ -290,11 +296,11 @@ export function LocationOnboarding({
                       type="text"
                       value={latInput}
                       onChange={(e) => setLatInput(e.target.value)}
-                      className="w-28 rounded-[2px] border border-[#262B33] bg-[#171A1F] px-2.5 py-1 font-mono text-xs tabular-nums tracking-tight text-[#ECEEF0] focus:border-emerald-500 focus:outline-none transition-colors duration-200 ease-out"
+                      className="w-28 rounded-md border border-line bg-panel px-2.5 py-1 font-mono text-xs tabular-nums tracking-tight text-ink focus:border-crop focus:outline-none transition-colors duration-200 ease-out"
                     />
                   </div>
                   <div className="flex items-center gap-2">
-                    <label htmlFor="onboard-lon" className="font-mono text-xs text-[#A1A8B3]">
+                    <label htmlFor="onboard-lon" className="font-mono text-xs text-ink-2">
                       Lon:
                     </label>
                     <input
@@ -302,12 +308,12 @@ export function LocationOnboarding({
                       type="text"
                       value={lonInput}
                       onChange={(e) => setLonInput(e.target.value)}
-                      className="w-28 rounded-[2px] border border-[#262B33] bg-[#171A1F] px-2.5 py-1 font-mono text-xs tabular-nums tracking-tight text-[#ECEEF0] focus:border-emerald-500 focus:outline-none transition-colors duration-200 ease-out"
+                      className="w-28 rounded-md border border-line bg-panel px-2.5 py-1 font-mono text-xs tabular-nums tracking-tight text-ink focus:border-crop focus:outline-none transition-colors duration-200 ease-out"
                     />
                   </div>
                   <button
                     type="submit"
-                    className="inline-flex items-center gap-1.5 rounded-[2px] border border-[#262B33] bg-[#171A1F] px-3 py-1 text-xs font-medium text-[#ECEEF0] hover:border-emerald-500/60 hover:text-emerald-300 transition-colors duration-200 ease-out cursor-pointer"
+                    className="inline-flex items-center gap-1.5 rounded-md border border-line bg-panel px-3 py-1 text-xs font-medium text-ink hover:border-crop/60 hover:text-crop transition-colors duration-200 ease-out cursor-pointer"
                   >
                     <span>{t.onboarding.coordOpen}</span>
                     <ArrowRight className="h-3 w-3" aria-hidden="true" />
@@ -317,12 +323,48 @@ export function LocationOnboarding({
             </div>
           </div>
 
-          {/* Right 5 Columns: Calm Vertical List of Example Regions */}
-          <div className="lg:col-span-5 border border-[#262B33] bg-[#171A1F]">
-            <div className="border-b border-[#262B33] px-5 py-3.5 text-xs font-medium text-[#A1A8B3]">
+          {/* Right 5 Columns: saved fields first, then example regions */}
+          <div className="lg:col-span-5 flex flex-col gap-4">
+          {savedFields.length > 0 && (
+            <div className="rounded-md border border-crop/35 bg-panel">
+              <div className="flex items-baseline justify-between border-b border-line px-5 py-3.5">
+                <span className="text-xs font-semibold text-crop">{t.saved.menu}</span>
+                <span className="text-[11px] text-ink-3">{t.saved.localNote}</span>
+              </div>
+              <ul className="max-h-[260px] overflow-y-auto divide-y divide-line">
+                {savedFields.map((f) => (
+                  <li key={f.id} className="group flex items-center pr-3">
+                    <button
+                      type="button"
+                      onClick={() => onLoadSaved(f)}
+                      className="flex min-w-0 flex-1 items-center gap-3 px-5 py-3 text-left hover:bg-raised transition-colors cursor-pointer"
+                    >
+                      <FieldGlyph field={f.field} />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium text-ink group-hover:text-crop">{f.name}</span>
+                        <span className="block text-xs tabular-nums text-ink-3">{savedFieldMeta(f, t.saved.point)}</span>
+                      </span>
+                      <ArrowRight className="h-4 w-4 shrink-0 text-ink-3 group-hover:text-crop" aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeSaved(f.id)}
+                      aria-label={`${t.saved.remove}: ${f.name}`}
+                      title={t.saved.remove}
+                      className="rounded-md p-1.5 text-ink-3 opacity-60 hover:bg-warn/10 hover:text-warn group-hover:opacity-100 focus-visible:opacity-100 cursor-pointer"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <div className="rounded-md border border-line bg-panel">
+            <div className="border-b border-line px-5 py-3.5 text-xs font-medium text-ink-2">
               {t.onboarding.presetsHeading}
             </div>
-            <div className="divide-y divide-[#262B33]">
+            <div className="divide-y divide-line">
               {PRESET_REGIONS.map((preset) => {
                 const localized = PRESET_TEXT[lang][preset.id];
                 return (
@@ -337,22 +379,22 @@ export function LocationOnboarding({
                         preset,
                       })
                     }
-                    className="group flex w-full flex-col gap-1.5 p-4 sm:p-5 text-left hover:bg-[#1D2128] transition-colors duration-200 ease-out cursor-pointer"
+                    className="group flex w-full flex-col gap-1.5 p-4 sm:p-5 text-left hover:bg-raised transition-colors duration-200 ease-out cursor-pointer"
                   >
                     <div className="flex items-center justify-between gap-3">
-                      <span className="text-sm font-medium text-[#ECEEF0] group-hover:text-emerald-300 transition-colors duration-200 ease-out">
+                      <span className="text-sm font-medium text-ink group-hover:text-crop transition-colors duration-200 ease-out">
                         {localized?.name ?? preset.name}
                       </span>
                       <ArrowRight
-                        className="h-4 w-4 text-[#7C8490] group-hover:text-emerald-400 shrink-0 transition-colors duration-200 ease-out"
+                        className="h-4 w-4 text-ink-3 group-hover:text-crop shrink-0 transition-colors duration-200 ease-out"
                         aria-hidden="true"
                       />
                     </div>
-                    <div className="font-mono text-[11px] tabular-nums tracking-tight text-[#7C8490]">
+                    <div className="font-mono text-[11px] tabular-nums tracking-tight text-ink-3">
                       {localized?.climateZone ?? preset.climateZone} · {preset.lat.toFixed(4)},{' '}
                       {preset.lon.toFixed(4)}
                     </div>
-                    <p className="text-xs leading-relaxed text-[#A1A8B3]">
+                    <p className="text-xs leading-relaxed text-ink-2">
                       {localized?.summary ?? preset.summary}
                     </p>
                   </button>
@@ -360,11 +402,12 @@ export function LocationOnboarding({
               })}
             </div>
           </div>
+          </div>
         </div>
       </main>
 
-      <footer className="border-t border-[#262B33] bg-[#111316] py-4">
-        <div className="mx-auto max-w-[1440px] px-4 sm:px-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between text-xs text-[#7C8490]">
+      <footer className="border-t border-line bg-ground py-4">
+        <div className="mx-auto max-w-[1440px] px-4 sm:px-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between text-xs text-ink-3">
           <span>{t.footer.left}</span>
           <div className="flex flex-wrap items-center gap-4">
             <a
@@ -373,7 +416,7 @@ export function LocationOnboarding({
                 e.preventDefault();
                 onNavigateLegal('/impressum');
               }}
-              className="hover:text-[#ECEEF0] transition-colors duration-200 ease-out"
+              className="hover:text-ink transition-colors duration-200 ease-out"
             >
               {t.footer.imprint}
             </a>
@@ -383,7 +426,7 @@ export function LocationOnboarding({
                 e.preventDefault();
                 onNavigateLegal('/datenschutz');
               }}
-              className="hover:text-[#ECEEF0] transition-colors duration-200 ease-out"
+              className="hover:text-ink transition-colors duration-200 ease-out"
             >
               {t.footer.privacy}
             </a>
@@ -393,7 +436,7 @@ export function LocationOnboarding({
                 e.preventDefault();
                 onNavigateLegal('/cookies');
               }}
-              className="hover:text-[#ECEEF0] transition-colors duration-200 ease-out"
+              className="hover:text-ink transition-colors duration-200 ease-out"
             >
               {t.footer.cookies}
             </a>

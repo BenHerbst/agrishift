@@ -5,7 +5,7 @@ import {
   type TimelineStepIncrement,
 } from './components/GlobalTimelineBar';
 import { LocationOnboarding } from './components/LocationOnboarding';
-import { GeospatialMap } from './components/GeospatialMap';
+import { GeospatialMap, type MapFocusTarget } from './components/GeospatialMap';
 import { RightDataPanel, type RightPanelTab } from './components/RightDataPanel';
 import { LegalPage, type LegalRoute } from './components/LegalPage';
 import { CookieBanner } from './components/CookieBanner';
@@ -21,6 +21,7 @@ import {
   fetchFieldAverageEarthSystemData,
 } from './services/earthDataService';
 import { fetchClimateForecast } from './services/climateForecastService';
+import type { SavedField } from './services/savedFieldsService';
 import {
   analyzeClimateSeries,
   buildForecastSeries,
@@ -317,6 +318,17 @@ export default function App() {
     });
   }, []);
 
+  // Camera jumps only for sites opened from outside the map (saved fields); map clicks never move it
+  const [mapFocus, setMapFocus] = useState<MapFocusTarget | null>(null);
+  const [openedSaved, setOpenedSaved] = useState<SavedField | null>(null);
+  const handleLoadSavedField = useCallback((saved: SavedField) => {
+    setOpenedSaved(saved);
+    setDrawnField(saved.field);
+    setCoords({ lat: saved.lat, lon: saved.lon, label: saved.name });
+    setMapFocus({ lat: saved.lat, lon: saved.lon, coordinates: saved.field?.coordinates, n: Date.now() });
+    setHasSelectedLocation(true);
+  }, []);
+
   const handleClearDrawnField = useCallback(() => {
     setDrawnField(null);
     setCoords((prev) => ({
@@ -433,6 +445,11 @@ export default function App() {
       ensembleRecords?.[selectedVariable] ?? null
     );
   }, [fullHorizonAnalysis, effectiveForecastMode, ensembleRecords, selectedVariable]);
+
+  const timelineStripes = useMemo(
+    () => fullForecastSeries.map((pt) => ({ year: pt.year, value: pt.value ?? pt.projectedValue })),
+    [fullForecastSeries]
+  );
 
   const slicedForecastSeries = useMemo(() => {
     if (!activeStats) return activeBaseSeries;
@@ -646,12 +663,11 @@ export default function App() {
     setTimelineStep(maxTimelineStep);
   }, [maxTimelineStep]);
 
-  const displayRegionName = localizeRegionName(
-    dataset?.regionName ?? coords.label,
-    coords.lat,
-    coords.lon,
-    lang
-  );
+  // A saved field keeps its own name until the user picks another site
+  const displayRegionName =
+    openedSaved && openedSaved.lat === coords.lat && openedSaved.lon === coords.lon
+      ? openedSaved.name
+      : localizeRegionName(dataset?.regionName ?? coords.label, coords.lat, coords.lon, lang);
 
   const mapTimelineTelemetry = useMemo(() => {
     if (!timelineSnapshot) return null;
@@ -671,10 +687,11 @@ export default function App() {
       ) : !hasSelectedLocation ? (
         <LocationOnboarding
           onConfirmLocation={handleConfirmOnboardingLocation}
+          onLoadSaved={handleLoadSavedField}
           onNavigateLegal={navigateTo}
         />
       ) : (
-        <div id="top" className="min-h-screen bg-[#111316] text-[#ECEEF0] flex flex-col">
+        <div id="top" className="min-h-screen bg-ground text-ink flex flex-col lg:h-dvh lg:min-h-0 lg:overflow-hidden">
           <HeaderBar
             regionName={displayRegionName}
             lat={coords.lat}
@@ -687,9 +704,11 @@ export default function App() {
             onExportCsv={handleExportCsv}
             onExportGeoJson={handleExportGeoJson}
             onExportPdf={handleExportPdf}
+            drawnField={drawnField}
+            onLoadSaved={handleLoadSavedField}
           />
 
-          <main className="mx-auto w-full max-w-[1600px] flex-1 border-x border-[#262B33] bg-[#262B33] flex flex-col gap-px">
+          <main className="mx-auto w-full max-w-[1600px] flex-1 lg:min-h-0 border-x border-line bg-line flex flex-col gap-px">
             <GlobalTimelineBar
               stepIndex={clampedTimelineStep}
               maxStep={maxTimelineStep}
@@ -707,13 +726,18 @@ export default function App() {
               onResetToFull={handleResetTimeline}
               onChangeStepIncrement={handleChangeStepIncrement}
               onSelectVariable={setSelectedVariable}
+              stripes={timelineStripes}
+              periodSteps={[
+                (activePeriod.start.year - BASE_TIMELINE_YEAR) * 12 + activePeriod.start.month - 1,
+                (activePeriod.end.year - BASE_TIMELINE_YEAR) * 12 + activePeriod.end.month - 1,
+              ]}
             />
 
             <section
               id="geospatial-map"
-              className="grid grid-cols-1 gap-px bg-[#262B33] lg:grid-cols-12 items-stretch flex-1"
+              className="grid grid-cols-1 gap-px bg-line lg:grid-cols-12 lg:grid-rows-[minmax(0,1fr)] items-stretch flex-1 lg:min-h-0"
             >
-              <div className="lg:col-span-6 bg-[#171A1F] flex flex-col min-w-0 overflow-hidden">
+              <div className="lg:col-span-6 bg-panel flex flex-col min-w-0 lg:min-h-0 overflow-hidden">
                 <GeospatialMap
                   lat={coords.lat}
                   lon={coords.lon}
@@ -723,9 +747,10 @@ export default function App() {
                   onSelectCoordinates={handleSelectMapCoordinates}
                   onConfirmDrawnField={handleConfirmDrawnField}
                   onClearDrawnField={handleClearDrawnField}
+                  focusTarget={mapFocus}
                 />
               </div>
-              <div className="lg:col-span-6 bg-[#171A1F] flex flex-col min-w-0">
+              <div className="lg:col-span-6 bg-panel flex flex-col min-w-0 lg:min-h-0 lg:overflow-hidden">
                 <RightDataPanel
                   activeTab={activeTab}
                   onSelectTab={setActiveTab}
@@ -762,8 +787,8 @@ export default function App() {
             </section>
           </main>
 
-          <footer className="border-t border-[#262B33] bg-[#111316] py-4">
-            <div className="mx-auto max-w-[1600px] px-4 sm:px-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between text-xs text-[#7C8490]">
+          <footer className="border-t border-line bg-ground py-4">
+            <div className="mx-auto max-w-[1600px] px-4 sm:px-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between text-xs text-ink-3">
               <span>{t.footer.left}</span>
               <div className="flex flex-wrap items-center gap-4">
                 <a
@@ -772,7 +797,7 @@ export default function App() {
                     e.preventDefault();
                     navigateTo('/impressum');
                   }}
-                  className="hover:text-[#ECEEF0] transition-colors duration-200 ease-out"
+                  className="hover:text-ink transition-colors duration-200 ease-out"
                 >
                   {t.footer.imprint}
                 </a>
@@ -782,7 +807,7 @@ export default function App() {
                     e.preventDefault();
                     navigateTo('/datenschutz');
                   }}
-                  className="hover:text-[#ECEEF0] transition-colors duration-200 ease-out"
+                  className="hover:text-ink transition-colors duration-200 ease-out"
                 >
                   {t.footer.privacy}
                 </a>
@@ -792,11 +817,11 @@ export default function App() {
                     e.preventDefault();
                     navigateTo('/cookies');
                   }}
-                  className="hover:text-[#ECEEF0] transition-colors duration-200 ease-out"
+                  className="hover:text-ink transition-colors duration-200 ease-out"
                 >
                   {t.footer.cookies}
                 </a>
-                <span className="hidden md:inline text-[#262B33]" aria-hidden="true">
+                <span className="hidden md:inline text-line" aria-hidden="true">
                   |
                 </span>
                 <span className="hidden md:inline">{t.footer.right}</span>

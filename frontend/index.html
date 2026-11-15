@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en" >
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -18,11 +18,19 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap"
       rel="stylesheet"
     />
+    <script>
+      // Theme before first paint: saved choice, else the system setting
+      try {
+        var saved = localStorage.getItem('terra-tuta-theme');
+        var dark = saved ? saved === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      } catch (e) {}
+    </script>
   </head>
-  <body class="bg-[#111316] text-[#ECEEF0] antialiased selection:bg-emerald-500/30 selection:text-emerald-200">
+  <body class="bg-ground text-ink antialiased selection:bg-crop/30 selection:text-ink">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

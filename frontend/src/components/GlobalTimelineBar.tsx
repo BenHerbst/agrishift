@@ -26,6 +26,35 @@ interface GlobalTimelineBarProps {
   onResetToFull: () => void;
   onChangeStepIncrement: (inc: TimelineStepIncrement) => void;
   onSelectVariable: (v: ClimateVariable) => void;
+  /** Selected variable per year (trend window), drawn as climate stripes behind the slider. */
+  stripes: Array<{ year: number; value: number | null }>;
+  /** First and last slider step of the active period, highlighted on the stripes. */
+  periodSteps: [number, number];
+}
+
+// ColorBrewer RdBu / BrBG, low → high
+const STRIPE_RAMPS: Record<ClimateVariable, string[]> = {
+  T2M: ['#2166ac', '#4393c3', '#92c5de', '#d1e5f0', '#f4f1ea', '#fddbc7', '#f4a582', '#d6604d', '#b2182b'],
+  PRECTOTCORR: ['#8c510a', '#bf812d', '#dfc27d', '#f6e8c3', '#eef0ea', '#c7eae5', '#80cdc1', '#35978f', '#01665e'],
+  GWETROOT: ['#8c510a', '#bf812d', '#dfc27d', '#f6e8c3', '#eef0ea', '#c7eae5', '#80cdc1', '#35978f', '#01665e'],
+  // More evaporation = drier, so the ramp runs the other way
+  EVLAND: ['#01665e', '#35978f', '#80cdc1', '#c7eae5', '#eef0ea', '#f6e8c3', '#dfc27d', '#bf812d', '#8c510a'],
+};
+
+/** Colour per year: anomaly against the measured years' mean, ±2 standard deviations span the ramp. */
+function stripeColors(stripes: GlobalTimelineBarProps['stripes'], variable: ClimateVariable): Map<number, string> {
+  const measured = stripes.filter((s) => s.year <= 2025 && s.value !== null).map((s) => s.value as number);
+  const out = new Map<number, string>();
+  if (measured.length < 3) return out;
+  const mean = measured.reduce((a, v) => a + v, 0) / measured.length;
+  const sd = Math.sqrt(measured.reduce((a, v) => a + (v - mean) ** 2, 0) / measured.length) || 1;
+  const ramp = STRIPE_RAMPS[variable];
+  for (const { year, value } of stripes) {
+    if (value === null) continue;
+    const z = Math.max(-1, Math.min(1, (value - mean) / (2 * sd)));
+    out.set(year, ramp[Math.round(((z + 1) / 2) * (ramp.length - 1))]);
+  }
+  return out;
 }
 
 const VARIABLES: ClimateVariable[] = ['T2M', 'PRECTOTCORR', 'GWETROOT', 'EVLAND'];
@@ -47,15 +76,19 @@ export function GlobalTimelineBar({
   onResetToFull,
   onChangeStepIncrement,
   onSelectVariable,
+  stripes,
+  periodSteps,
 }: GlobalTimelineBarProps) {
   const { lang, t } = useI18n();
   const monthNames = MONTH_SHORT_BY_LANG[lang];
   const isProjectedPeriod = activeYear > 2025;
   // The slider's last step defines the end year: 2025 (measured), ~2028 (ensemble) or 2035 (trend)
   const maxYear = DISPLAY_START_YEAR + Math.floor(Math.max(0, maxStep) / 12);
-  const maxMonthLabel = monthNames[Math.max(0, Math.min(11, maxStep % 12))];
 
-  const progressPct = maxStep > 0 ? Math.min(100, Math.max(0, (stepIndex / maxStep) * 100)) : 100;
+  const stepPct = (step: number) => (maxStep > 0 ? Math.min(100, Math.max(0, (step / (maxStep + 1)) * 100)) : 0);
+  const colors = stripeColors(stripes, selectedVariable);
+  const stripeYears: number[] = [];
+  for (let yr = DISPLAY_START_YEAR; yr <= maxYear; yr++) stripeYears.push(yr);
   const cutoff2025Step = (2025 - DISPLAY_START_YEAR) * 12 + 11;
   const cutoff2025Pct = maxStep > 0 ? Math.min(100, (cutoff2025Step / maxStep) * 100) : 100;
 
@@ -75,7 +108,7 @@ export function GlobalTimelineBar({
   return (
     <section
       aria-label={t.trends.timelineLabel}
-      className="bg-[#111316] border-b border-[#262B33] px-4 sm:px-6 py-3 space-y-2.5"
+      className="bg-ground border-b border-line px-4 sm:px-6 py-3 space-y-2.5"
     >
       <div className="flex flex-col gap-2.5 xl:flex-row xl:items-center xl:justify-between">
         {/* Left: Playback Controls + Active Month/Year Readout */}
@@ -84,10 +117,10 @@ export function GlobalTimelineBar({
             type="button"
             onClick={onTogglePlay}
             disabled={isLoading}
-            className={`inline-flex items-center gap-1.5 rounded-[2px] border px-3 py-1.5 text-xs font-medium transition-colors duration-200 ease-out cursor-pointer disabled:opacity-40 ${
+            className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors duration-200 ease-out cursor-pointer disabled:opacity-40 ${
               isPlaying
-                ? 'border-amber-500/50 bg-amber-500/15 text-amber-300'
-                : 'border-emerald-500/55 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25'
+                ? 'border-warn/50 bg-warn/15 text-warn'
+                : 'border-crop/55 bg-crop/15 text-crop hover:bg-crop/25'
             }`}
           >
             {isPlaying ? (
@@ -104,7 +137,7 @@ export function GlobalTimelineBar({
           </button>
 
           {/* Granularity / Speed: 1M | 3M | 1J */}
-          <div className="flex items-center gap-px border border-[#262B33] bg-[#262B33]">
+          <div className="flex items-center gap-px border border-line bg-line">
             {stepOptions.map((opt) => {
               const active = stepIncrement === opt.value;
               return (
@@ -114,8 +147,8 @@ export function GlobalTimelineBar({
                   onClick={() => onChangeStepIncrement(opt.value)}
                   className={`px-2 py-1 text-[11px] font-mono transition-colors duration-200 ease-out cursor-pointer ${
                     active
-                      ? 'bg-[#222730] text-emerald-300 font-semibold'
-                      : 'bg-[#171A1F] text-[#A1A8B3] hover:text-[#ECEEF0]'
+                      ? 'bg-raised text-crop font-semibold'
+                      : 'bg-panel text-ink-2 hover:text-ink'
                   }`}
                 >
                   {opt.label}
@@ -128,7 +161,7 @@ export function GlobalTimelineBar({
             <button
               type="button"
               onClick={onResetToFull}
-              className="inline-flex items-center gap-1 rounded-[2px] border border-[#262B33] bg-[#171A1F] px-2.5 py-1 text-[11px] text-[#A1A8B3] hover:text-[#ECEEF0] transition-colors duration-200 ease-out cursor-pointer"
+              className="inline-flex items-center gap-1 rounded-md border border-line bg-panel px-2.5 py-1 text-[11px] text-ink-2 hover:text-ink transition-colors duration-200 ease-out cursor-pointer"
             >
               <RotateCcw className="h-3 w-3" aria-hidden="true" />
               <span>{t.trends.resetBtn}</span>
@@ -136,22 +169,22 @@ export function GlobalTimelineBar({
           )}
 
           <div className="flex items-center gap-2 pl-1">
-            <Calendar className="h-3.5 w-3.5 text-[#7C8490]" aria-hidden="true" />
-            <span className="font-mono text-sm font-semibold tabular-nums text-[#ECEEF0] min-w-[78px] whitespace-nowrap">
-              {stepIncrement > 1 && <span className="mr-1 text-[#7C8490]">Ø</span>}
+            <Calendar className="h-3.5 w-3.5 text-ink-3" aria-hidden="true" />
+            <span className="font-mono text-sm font-semibold tabular-nums text-ink min-w-[78px] whitespace-nowrap">
+              {stepIncrement > 1 && <span className="mr-1 text-ink-3">Ø</span>}
               {periodLabel}
             </span>
             <span
-              className={`rounded-[2px] border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide ${
+              className={`rounded-md border px-1.5 py-0.5 font-mono text-[10px] ${
                 isProjectedPeriod
-                  ? 'border-amber-500/40 bg-amber-500/12 text-amber-300'
-                  : 'border-emerald-500/35 bg-emerald-500/10 text-emerald-300'
+                  ? 'border-warn/40 bg-warn/12 text-warn'
+                  : 'border-crop/35 bg-crop/10 text-crop'
               }`}
             >
               {isProjectedPeriod ? t.trends.projBadge : t.trends.obsBadge}
             </span>
             {forecastLoading && (
-              <span className="inline-flex items-center gap-1 rounded-[2px] border border-emerald-500/35 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-200">
+              <span className="inline-flex items-center gap-1 rounded-md border border-crop/35 bg-crop/10 px-1.5 py-0.5 text-[10px] text-crop">
                 <RefreshCw className="h-3 w-3 animate-spin" aria-hidden="true" />
                 {t.trends.timelineForecastLoading}
               </span>
@@ -160,7 +193,7 @@ export function GlobalTimelineBar({
         </div>
 
         {/* Right: 4 Live Monthly KPI Telemetry Chips */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-px border border-[#262B33] bg-[#262B33]">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-px border border-line bg-line">
           {VARIABLES.map((variable) => {
             const active = selectedVariable === variable;
             const meta = VARIABLE_META[variable];
@@ -181,18 +214,18 @@ export function GlobalTimelineBar({
                 onClick={() => onSelectVariable(variable)}
                 className={`px-3 py-1.5 text-left transition-colors duration-200 ease-out cursor-pointer min-w-[132px] ${
                   active
-                    ? 'bg-[#1E232B] ring-1 ring-inset ring-emerald-500/50'
-                    : 'bg-[#171A1F] hover:bg-[#1B2027]'
+                    ? 'bg-raised ring-1 ring-inset ring-crop/50'
+                    : 'bg-panel hover:bg-raised'
                 }`}
               >
-                <div className="flex items-center justify-between gap-2 text-[10px] text-[#A1A8B3]">
-                  <span className={active ? 'text-emerald-300 font-medium' : ''}>
+                <div className="flex items-center justify-between gap-2 text-[10px] text-ink-2">
+                  <span className={active ? 'text-crop font-medium' : ''}>
                     {VARIABLE_TEXT[lang][variable].shortLabel}
                   </span>
                   {valEntry && (
                     <span
                       className={`font-mono tabular-nums ${
-                        isWarningAnom ? 'text-amber-300' : 'text-[#7C8490]'
+                        isWarningAnom ? 'text-warn' : 'text-ink-3'
                       }`}
                     >
                       {anomSign}
@@ -200,7 +233,7 @@ export function GlobalTimelineBar({
                     </span>
                   )}
                 </div>
-                <div className="mt-0.5 font-mono text-xs font-semibold tabular-nums text-[#ECEEF0]">
+                <div className="mt-0.5 font-mono text-xs font-semibold tabular-nums text-ink">
                   {isLoading || !valEntry
                     ? '—'
                     : `${valEntry.value.toFixed(decimals)} ${meta.unit}`}
@@ -212,45 +245,58 @@ export function GlobalTimelineBar({
       </div>
 
       {/* Bottom Row: Full-Width Month-by-Month Range Slider + Decade Scale */}
-      <div className="space-y-1">
-        <div className="flex items-center gap-3">
-          <span className="font-mono text-[11px] tabular-nums text-[#7C8490] shrink-0">
-            {monthNames[0]} {DISPLAY_START_YEAR}
-          </span>
-
-          <div className="relative flex-1 flex items-center">
-            {forecastMode !== 'historical' && (
-              <span
-                aria-hidden="true"
-                className="pointer-events-none absolute top-0 bottom-0 w-px bg-[#7C8490]/60 z-0"
-                style={{ left: `${cutoff2025Pct}%` }}
-              />
-            )}
-            <input
-              type="range"
-              min={0}
-              max={maxStep}
-              step={1}
-              value={Math.min(stepIndex, maxStep)}
-              disabled={isLoading}
-              onChange={(e) => onChangeStep(Number(e.target.value))}
-              aria-label={t.trends.timelineAria}
-              style={{
-                background: `linear-gradient(to right, ${
-                  isProjectedPeriod ? '#d97706' : '#10b981'
-                } ${progressPct}%, #262B33 ${progressPct}%)`,
-              }}
-              className="relative z-10 w-full h-1.5 appearance-none rounded-[2px] accent-emerald-400 cursor-pointer disabled:opacity-50"
-            />
+      <div className="space-y-1.5">
+        <div className="relative h-11">
+          {/* One stripe per year; months after the slider stay faded until they are reached */}
+          <div aria-hidden="true" className="absolute inset-0 flex overflow-hidden rounded-md ring-1 ring-line bg-raised">
+            {stripeYears.map((yr) => {
+              const months = yr < maxYear ? 12 : (maxStep % 12) + 1;
+              return (
+                <div
+                  key={yr}
+                  className="h-full transition-opacity duration-300"
+                  style={{
+                    flex: months,
+                    background: colors.get(yr) ?? 'transparent',
+                    opacity: yr > activeYear ? 0.32 : 1,
+                  }}
+                />
+              );
+            })}
           </div>
-
-          <span className="font-mono text-[11px] tabular-nums text-[#7C8490] shrink-0">
-            {maxMonthLabel} {maxYear}
-          </span>
+          {forecastMode !== 'historical' && cutoff2025Step < maxStep && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-y-0 right-0 border-l-2 border-dashed border-ink/50"
+              style={{ left: `${cutoff2025Pct}%` }}
+            >
+              <span className="absolute bottom-1 left-1 rounded-sm bg-panel/85 px-1 text-[10px] font-semibold text-ink">{t.trends.projBadge}</span>
+            </div>
+          )}
+          {/* Active period bracket */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -inset-y-1 rounded-sm border-2 border-ink bg-white/25 transition-[left,width] duration-200 ease-out"
+            style={{
+              left: `${stepPct(periodSteps[0])}%`,
+              width: `max(4px, ${stepPct(periodSteps[1] + 1) - stepPct(periodSteps[0])}%)`,
+            }}
+          />
+          <input
+            type="range"
+            min={0}
+            max={maxStep}
+            step={1}
+            value={Math.min(stepIndex, maxStep)}
+            disabled={isLoading}
+            onChange={(e) => onChangeStep(Number(e.target.value))}
+            aria-label={t.trends.timelineAria}
+            aria-valuetext={periodLabel}
+            className="timeline-range absolute inset-0 h-full w-full cursor-pointer disabled:cursor-wait"
+          />
         </div>
 
-        {/* Clean Year Scale Ticks */}
-        <div className="hidden sm:flex items-center justify-between px-16 font-mono text-[10px] tabular-nums text-[#7C8490]">
+        <div className="relative h-4 text-[11px] font-mono text-ink-3">
           {tickYears.map((yr) => (
             <button
               key={yr}
@@ -262,14 +308,16 @@ export function GlobalTimelineBar({
                 );
                 onChangeStep(targetStep);
               }}
-              className={`cursor-pointer transition-colors hover:text-[#ECEEF0] ${
-                yr === activeYear ? 'text-emerald-300 font-semibold' : ''
+              style={{ left: `${stepPct((yr - DISPLAY_START_YEAR) * 12 + 6)}%` }}
+              className={`absolute -translate-x-1/2 cursor-pointer transition-colors hover:text-ink ${
+                yr === activeYear ? 'text-ink font-semibold' : ''
               }`}
             >
               {yr}
             </button>
           ))}
         </div>
+        <p className="text-[11px] text-ink-3">{t.trends.stripesHint}</p>
       </div>
     </section>
   );

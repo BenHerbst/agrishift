@@ -36,9 +36,9 @@ export function CookieBanner({ onNavigateLegal }: CookieBannerProps) {
     <div
       role="region"
       aria-label={t.legal.tabs.cookies}
-      className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-5 sm:max-w-md z-40 border border-[#262B33] bg-[#171A1F] p-4 space-y-3"
+      className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-5 sm:max-w-md z-40 border border-line bg-panel p-4 space-y-3"
     >
-      <p className="text-xs leading-relaxed text-[#A1A8B3]">{t.cookieBanner.text}</p>
+      <p className="text-xs leading-relaxed text-ink-2">{t.cookieBanner.text}</p>
       <div className="flex items-center justify-end gap-2">
         <a
           href="/cookies"
@@ -46,14 +46,14 @@ export function CookieBanner({ onNavigateLegal }: CookieBannerProps) {
             e.preventDefault();
             onNavigateLegal('/cookies');
           }}
-          className="rounded-[2px] border border-[#262B33] bg-[#111316] px-3 py-1.5 text-xs text-[#ECEEF0] hover:border-[#3A414D] transition-colors duration-200 ease-out"
+          className="rounded-md border border-line bg-ground px-3 py-1.5 text-xs text-ink hover:border-line-strong transition-colors duration-200 ease-out"
         >
           {t.cookieBanner.learnMore}
         </a>
         <button
           type="button"
           onClick={handleAcknowledge}
-          className="rounded-[2px] bg-emerald-500 px-3.5 py-1.5 text-xs font-semibold text-[#111316] hover:bg-emerald-400 transition-colors duration-200 ease-out cursor-pointer"
+          className="rounded-md bg-crop px-3.5 py-1.5 text-xs font-semibold text-ground hover:bg-crop/90 transition-colors duration-200 ease-out cursor-pointer"
         >
           {t.cookieBanner.accept}
         </button>

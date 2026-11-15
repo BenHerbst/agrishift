@@ -55,7 +55,7 @@ export function LanguageSwitcher() {
 
   return (
     <div
-      className="inline-flex items-center rounded-[2px] border border-[#262B33] bg-[#111316] p-0.5 shrink-0"
+      className="inline-flex items-center rounded-md border border-line bg-ground p-0.5 shrink-0"
       role="group"
       aria-label={lang === 'de' ? 'Sprachauswahl' : 'Language selection'}
     >
@@ -63,10 +63,10 @@ export function LanguageSwitcher() {
         type="button"
         onClick={() => setLang('de')}
         aria-pressed={lang === 'de'}
-        className={`rounded-[2px] px-2.5 py-1 font-mono text-[11px] font-semibold tracking-wider transition-colors duration-200 ease-out whitespace-nowrap shrink-0 cursor-pointer ${
+        className={`rounded-md px-2.5 py-1 font-mono text-[11px] font-semibold tracking-wider transition-colors duration-200 ease-out whitespace-nowrap shrink-0 cursor-pointer ${
           lang === 'de'
-            ? 'bg-[#262B33] text-emerald-300'
-            : 'text-[#A1A8B3] hover:text-[#ECEEF0]'
+            ? 'bg-line text-crop'
+            : 'text-ink-2 hover:text-ink'
         }`}
       >
         DE
@@ -75,10 +75,10 @@ export function LanguageSwitcher() {
         type="button"
         onClick={() => setLang('en')}
         aria-pressed={lang === 'en'}
-        className={`rounded-[2px] px-2.5 py-1 font-mono text-[11px] font-semibold tracking-wider transition-colors duration-200 ease-out whitespace-nowrap shrink-0 cursor-pointer ${
+        className={`rounded-md px-2.5 py-1 font-mono text-[11px] font-semibold tracking-wider transition-colors duration-200 ease-out whitespace-nowrap shrink-0 cursor-pointer ${
           lang === 'en'
-            ? 'bg-[#262B33] text-emerald-300'
-            : 'text-[#A1A8B3] hover:text-[#ECEEF0]'
+            ? 'bg-line text-crop'
+            : 'text-ink-2 hover:text-ink'
         }`}
       >
         EN

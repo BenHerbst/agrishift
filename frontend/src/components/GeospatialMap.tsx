@@ -43,7 +43,16 @@ interface MapTimelineTelemetry {
   moisture?: number;
 }
 
+/** Fly here when `n` changes (sites opened from outside the map, e.g. a saved field). */
+export interface MapFocusTarget {
+  lat: number;
+  lon: number;
+  coordinates?: Array<[number, number]>;
+  n: number;
+}
+
 interface GeospatialMapProps {
+  focusTarget?: MapFocusTarget | null;
   lat: number;
   lon: number;
   regionName: string;
@@ -301,7 +310,7 @@ const HEAT_MAX_ZOOM = 11.5;
 const HEAT_OPACITY = 0.72;
 /** Close in, the 0.5° cells are drawn as a flat tint (the heatmap kernel would get huge). */
 const HEAT_CELL_MIN_ZOOM = HEAT_MAX_ZOOM - 0.6;
-const HEAT_CELL_OPACITY = 0.38;
+const HEAT_CELL_OPACITY = 0.3;
 // Mapbox heatmap kernel: weight · intensity · GAUSS_COEF · exp(-4.5 · (d / radius)²)
 const GAUSS_COEF = 0.3989422804014327;
 
@@ -416,6 +425,7 @@ export function GeospatialMap({
   onSelectCoordinates,
   onConfirmDrawnField,
   onClearDrawnField,
+  focusTarget,
 }: GeospatialMapProps) {
   const { t } = useI18n();
   const [basemap, setBasemap] = useState<BasemapMode>('satellite');
@@ -1014,6 +1024,26 @@ export function GeospatialMap({
     syncMapboxLayers(map);
   }, [lat, lon, regionName, drawnField, styleRevision]);
 
+  const focusDoneRef = useRef(0);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || styleRevision === 0 || !focusTarget || focusTarget.n === focusDoneRef.current) return;
+    focusDoneRef.current = focusTarget.n;
+    const pts = focusTarget.coordinates;
+    if (pts && pts.length >= 3) {
+      setIsDrawingField(false);
+      setDraftVertices([]);
+      const lons = pts.map((p) => p[0]);
+      const lats = pts.map((p) => p[1]);
+      map.fitBounds(
+        [[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]],
+        { padding: 80, maxZoom: 16.5, duration: 900, essential: true }
+      );
+    } else {
+      map.flyTo({ center: [focusTarget.lon, focusTarget.lat], zoom: Math.max(map.getZoom(), 13), duration: 900, essential: true });
+    }
+  }, [focusTarget, styleRevision]);
+
   // Climate layer on/off. The camera stays put; the cell tint covers close zoom levels.
   const prevHeatActiveRef = useRef(false);
   useEffect(() => {
@@ -1106,22 +1136,22 @@ export function GeospatialMap({
       : null;
 
   return (
-    <div className="flex flex-col bg-[#171A1F] h-full min-w-0 overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#262B33] px-4 sm:px-5 py-3">
+    <div className="flex flex-col bg-panel h-full min-w-0 overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 sm:px-5 py-3">
         <div>
-          <h2 className="text-sm font-semibold text-[#ECEEF0]">{t.map.title}</h2>
-          <p className="text-xs text-[#A1A8B3] mt-0.5">{t.map.subtitle}</p>
+          <h2 className="text-sm font-semibold text-ink">{t.map.title}</h2>
+          <p className="text-xs text-ink-2 mt-0.5">{t.map.subtitle}</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-px bg-[#262B33] border border-[#262B33]">
+          <div className="flex items-center gap-px bg-line border border-line">
             <button
               type="button"
               onClick={() => setBasemap('dark')}
               className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs transition-colors duration-200 ease-out whitespace-nowrap shrink-0 cursor-pointer ${
                 basemap === 'dark'
-                  ? 'bg-[#222730] text-[#ECEEF0] font-medium'
-                  : 'bg-[#111316] text-[#A1A8B3] hover:text-[#ECEEF0]'
+                  ? 'bg-raised text-ink font-medium'
+                  : 'bg-ground text-ink-2 hover:text-ink'
               }`}
             >
               <Globe className="h-3 w-3" aria-hidden="true" />
@@ -1132,8 +1162,8 @@ export function GeospatialMap({
               onClick={() => setBasemap('satellite')}
               className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs transition-colors duration-200 ease-out whitespace-nowrap shrink-0 cursor-pointer ${
                 basemap === 'satellite'
-                  ? 'bg-[#222730] text-[#ECEEF0] font-medium'
-                  : 'bg-[#111316] text-[#A1A8B3] hover:text-[#ECEEF0]'
+                  ? 'bg-raised text-ink font-medium'
+                  : 'bg-ground text-ink-2 hover:text-ink'
               }`}
             >
               <Layers className="h-3 w-3" aria-hidden="true" />
@@ -1154,10 +1184,10 @@ export function GeospatialMap({
                 setIsDrawingField(true);
               }
             }}
-            className={`inline-flex items-center gap-1.5 rounded-[2px] border px-2.5 py-1 text-xs transition-colors duration-200 ease-out whitespace-nowrap shrink-0 cursor-pointer ${
+            className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors duration-200 ease-out whitespace-nowrap shrink-0 cursor-pointer ${
               isDrawingField
-                ? 'border-emerald-500/55 bg-emerald-500/15 text-emerald-300 font-medium'
-                : 'border-[#262B33] bg-[#111316] text-[#ECEEF0] hover:border-emerald-500/50 hover:text-emerald-300'
+                ? 'border-crop/55 bg-crop/15 text-crop font-medium'
+                : 'border-line bg-ground text-ink hover:border-crop/50 hover:text-crop'
             }`}
           >
             <PenTool className="h-3.5 w-3.5" aria-hidden="true" />
@@ -1173,7 +1203,7 @@ export function GeospatialMap({
                 setCursorCoord(null);
                 setIsDrawingField(true);
               }}
-              className="inline-flex items-center gap-1.5 rounded-[2px] border border-[#262B33] bg-[#111316] px-2.5 py-1 text-xs text-[#A1A8B3] hover:border-amber-500/40 hover:text-amber-300 transition-colors duration-200 ease-out whitespace-nowrap shrink-0 cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-md border border-line bg-ground px-2.5 py-1 text-xs text-ink-2 hover:border-warn/40 hover:text-warn transition-colors duration-200 ease-out whitespace-nowrap shrink-0 cursor-pointer"
             >
               <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
               <span>{t.map.clearField}</span>
@@ -1184,12 +1214,12 @@ export function GeospatialMap({
 
       {/* Dedicated Non-Overlapping Drawing Toolbar Strip */}
       {isDrawingField && (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#262B33] bg-[#111316] px-4 sm:px-5 py-2 text-xs">
-          <div className="flex items-center gap-2 text-[#A1A8B3]">
-            <span className="h-2 w-2 rounded-full bg-emerald-400 shrink-0" />
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-ground px-4 sm:px-5 py-2 text-xs">
+          <div className="flex items-center gap-2 text-ink-2">
+            <span className="h-2 w-2 rounded-full bg-crop shrink-0" />
             <span>{t.map.drawingHint}</span>
             {draftPreviewMetrics && (
-              <span className="font-mono text-emerald-300 tabular-nums">
+              <span className="font-mono text-crop tabular-nums">
                 · {draftPreviewMetrics.areaHectares.toFixed(2)} ha
               </span>
             )}
@@ -1200,7 +1230,7 @@ export function GeospatialMap({
               type="button"
               onClick={() => setDraftVertices((prev) => prev.slice(0, -1))}
               disabled={draftVertices.length === 0}
-              className="inline-flex items-center gap-1 rounded-[2px] border border-[#262B33] bg-[#171A1F] px-2.5 py-1 text-xs text-[#ECEEF0] hover:border-[#3A414D] disabled:opacity-40 transition-colors duration-200 ease-out cursor-pointer"
+              className="inline-flex items-center gap-1 rounded-md border border-line bg-panel px-2.5 py-1 text-xs text-ink hover:border-line-strong disabled:opacity-40 transition-colors duration-200 ease-out cursor-pointer"
             >
               <Undo2 className="h-3 w-3" aria-hidden="true" />
               <span>{t.map.drawUndo}</span>
@@ -1210,7 +1240,7 @@ export function GeospatialMap({
               type="button"
               onClick={() => finishDrawing(draftVertices)}
               disabled={draftVertices.length < 3}
-              className="inline-flex items-center gap-1 rounded-[2px] bg-emerald-500 px-2.5 py-1 text-xs font-medium text-[#111316] hover:bg-emerald-400 disabled:opacity-40 transition-colors duration-200 ease-out cursor-pointer"
+              className="inline-flex items-center gap-1 rounded-md bg-crop px-2.5 py-1 text-xs font-medium text-ground hover:bg-crop/90 disabled:opacity-40 transition-colors duration-200 ease-out cursor-pointer"
             >
               <Check className="h-3 w-3" aria-hidden="true" />
               <span>
@@ -1228,7 +1258,7 @@ export function GeospatialMap({
                 setDraftVertices([]);
                 setCursorCoord(null);
               }}
-              className="inline-flex items-center gap-1 rounded-[2px] border border-[#262B33] bg-[#171A1F] px-2.5 py-1 text-xs text-[#A1A8B3] hover:text-[#ECEEF0] transition-colors duration-200 ease-out cursor-pointer"
+              className="inline-flex items-center gap-1 rounded-md border border-line bg-panel px-2.5 py-1 text-xs text-ink-2 hover:text-ink transition-colors duration-200 ease-out cursor-pointer"
             >
               <X className="h-3 w-3" aria-hidden="true" />
               <span>{t.map.drawCancel}</span>
@@ -1237,11 +1267,11 @@ export function GeospatialMap({
         </div>
       )}
 
-      <div className="relative flex-1 min-h-[380px] lg:min-h-[540px] w-full overflow-hidden isolate z-0 bg-[#111316]">
+      <div className="relative flex-1 min-h-[380px] lg:min-h-0 w-full overflow-hidden isolate z-0 bg-ground">
         <div ref={containerRef} className="absolute inset-0 h-full w-full" />
 
         {mapError && (
-          <div className="absolute inset-0 flex items-center justify-center p-6 text-center text-xs text-amber-300 bg-[#111316]/90">
+          <div className="absolute inset-0 flex items-center justify-center p-6 text-center text-xs text-warn bg-ground/90">
             {mapError}
           </div>
         )}
@@ -1252,7 +1282,7 @@ export function GeospatialMap({
             onClick={() => mapRef.current?.easeTo({ center: [lon, lat], duration: 700, essential: true })}
             title={t.map.recenter}
             aria-label={t.map.recenter}
-            className="absolute left-[10px] top-[78px] z-10 flex h-[29px] w-[29px] items-center justify-center rounded-[4px] bg-white text-[#333] shadow-[0_0_0_2px_rgba(0,0,0,0.1)] hover:bg-[#f2f2f2] cursor-pointer"
+            className="absolute left-[10px] top-[78px] z-10 flex h-[29px] w-[29px] items-center justify-center rounded-md border border-line bg-panel text-ink shadow-[0_1px_2px_rgba(28,38,31,0.12)] hover:bg-raised cursor-pointer"
           >
             <LocateFixed className="h-4 w-4" aria-hidden="true" />
           </button>
@@ -1260,8 +1290,8 @@ export function GeospatialMap({
 
         {/* Top-Right Climate Layer Toggles + Legend */}
         <div className="pointer-events-none absolute top-3 right-3 z-10 flex w-[min(17.5rem,calc(100%-4.5rem))] flex-col items-end gap-2">
-          <div className="pointer-events-auto w-full border border-[#262B33] bg-[#111316]/85 backdrop-blur-md p-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.35)]">
-            <div className="px-1 pb-1.5 text-[9px] font-mono uppercase tracking-[0.14em] text-[#7C8490]">
+          <div className="pointer-events-auto w-full border border-line bg-ground/85 backdrop-blur-md p-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.35)]">
+            <div className="px-1 pb-1.5 text-[9px] font-mono text-ink-3">
               {t.map.heatTitle}
             </div>
             <div className="grid grid-cols-3 gap-1">
@@ -1276,10 +1306,10 @@ export function GeospatialMap({
                     type="button"
                     aria-pressed={active}
                     onClick={() => setHeatLayer((cur) => (cur === id ? null : id))}
-                    className={`group relative flex flex-col items-center gap-1 overflow-hidden rounded-[2px] border px-1 pt-1.5 pb-2 text-[10px] transition-all duration-300 ease-out cursor-pointer ${
+                    className={`group relative flex flex-col items-center gap-1 overflow-hidden rounded-md border px-1 pt-1.5 pb-2 text-[10px] transition-all duration-300 ease-out cursor-pointer ${
                       active
-                        ? 'border-[#3A414D] bg-[#222730] text-[#ECEEF0]'
-                        : 'border-transparent bg-transparent text-[#A1A8B3] hover:bg-[#171A1F] hover:text-[#ECEEF0]'
+                        ? 'border-line-strong bg-raised text-ink'
+                        : 'border-transparent bg-transparent text-ink-2 hover:bg-panel hover:text-ink'
                     }`}
                   >
                     {active && heatStatus === 'loading' ? (
@@ -1313,20 +1343,20 @@ export function GeospatialMap({
             const kindLabel =
               heatFrame?.kind === 'forecast' ? t.map.heatForecast : heatFrame?.kind === 'normal' ? t.map.heatNormal : t.map.heatMeasured;
             return (
-              <div className="pointer-events-auto w-full border border-[#262B33] bg-[#111316]/85 backdrop-blur-md px-3 py-2.5 shadow-[0_8px_30px_rgba(0,0,0,0.35)] heat-legend-enter">
+              <div className="pointer-events-auto w-full border border-line bg-ground/85 backdrop-blur-md px-3 py-2.5 shadow-[0_8px_30px_rgba(0,0,0,0.35)] heat-legend-enter">
                 <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-xs font-semibold text-[#ECEEF0]">
+                  <span className="text-xs font-semibold text-ink">
                     {heatLayer === 'temp' ? t.map.heatTemp : heatLayer === 'precip' ? t.map.heatPrecip : t.map.heatMoisture}
                   </span>
-                  <span key={heatPeriodKey} className="font-mono text-[11px] tabular-nums text-emerald-300 heat-month-tick whitespace-nowrap">
+                  <span key={heatPeriodKey} className="font-mono text-[11px] tabular-nums text-crop heat-month-tick whitespace-nowrap">
                     {activeTimeline ? `${heatMonths.length > 1 ? 'Ø ' : ''}${activeTimeline.periodLabel}` : ''}
                   </span>
                 </div>
 
                 {heatStatus === 'error' ? (
-                  <p className="mt-2 text-[11px] text-amber-300">{t.map.heatError}</p>
+                  <p className="mt-2 text-[11px] text-warn">{t.map.heatError}</p>
                 ) : !range ? (
-                  <p className="mt-2 flex items-center gap-1.5 text-[11px] text-[#A1A8B3]">
+                  <p className="mt-2 flex items-center gap-1.5 text-[11px] text-ink-2">
                     <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
                     {t.map.heatLoading}
                   </p>
@@ -1334,7 +1364,7 @@ export function GeospatialMap({
                   <>
                     <div className="relative mt-2.5 mb-1">
                       <div
-                        className="h-2.5 w-full rounded-[2px] ring-1 ring-white/10"
+                        className="h-2.5 w-full rounded-md ring-1 ring-white/10"
                         style={{ background: `linear-gradient(90deg, ${spec.colors.join(', ')})` }}
                       />
                       {sitePos && (
@@ -1346,30 +1376,30 @@ export function GeospatialMap({
                       )}
                       {cursorPos && (
                         <div
-                          className="absolute -top-0.5 h-[14px] w-[2px] -translate-x-1/2 rounded-full bg-emerald-300/90 transition-[left] duration-150 ease-out"
+                          className="absolute -top-0.5 h-[14px] w-[2px] -translate-x-1/2 rounded-full bg-crop/90 transition-[left] duration-150 ease-out"
                           style={{ left: cursorPos }}
                         />
                       )}
                     </div>
-                    <div className="flex justify-between font-mono text-[10px] tabular-nums text-[#7C8490]">
+                    <div className="flex justify-between font-mono text-[10px] tabular-nums text-ink-3">
                       <span>{fmt(range[0])}</span>
                       <span>{fmt(range[1])}</span>
                     </div>
                     <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono text-[10px] tabular-nums">
                       {heatSiteValue !== undefined && Number.isFinite(heatSiteValue) && (
-                        <span className="text-[#ECEEF0]">
+                        <span className="text-ink">
                           <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-white align-middle" />
                           {t.map.heatSite} {fmt(heatSiteValue)}
                         </span>
                       )}
                       {heatCursorValue !== null && (
-                        <span className="text-emerald-300">
-                          <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-emerald-300 align-middle" />
+                        <span className="text-crop">
+                          <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-crop align-middle" />
                           {t.map.heatCursor} {fmt(heatCursorValue)}
                         </span>
                       )}
                     </div>
-                    <p className="mt-1.5 border-t border-[#262B33] pt-1.5 text-[10px] leading-snug text-[#7C8490]">
+                    <p className="mt-1.5 border-t border-line pt-1.5 text-[10px] leading-snug text-ink-3">
                       {kindLabel}
                     </p>
                   </>
@@ -1385,7 +1415,7 @@ export function GeospatialMap({
                 const box = regionalBox(lat, lon);
                 mapRef.current?.fitBounds([[box.lonMin, box.latMin], [box.lonMax, box.latMax]], { duration: 1200, essential: true });
               }}
-              className="pointer-events-auto border border-[#262B33] bg-[#111316]/85 backdrop-blur-md px-2.5 py-1 text-[10px] text-[#A1A8B3] hover:text-[#ECEEF0] transition-colors cursor-pointer"
+              className="pointer-events-auto border border-line bg-ground/85 backdrop-blur-md px-2.5 py-1 text-[10px] text-ink-2 hover:text-ink transition-colors cursor-pointer"
             >
               {t.map.heatZoomHint}
             </button>
@@ -1393,49 +1423,49 @@ export function GeospatialMap({
         </div>
 
         {/* Bottom-Left Site / Field Coordinates & Scale Legend */}
-        <div className="pointer-events-auto absolute bottom-3 left-3 z-10 max-w-[calc(100%-5rem)] sm:max-w-[78%] border border-[#262B33] bg-[#111316]/95 px-2.5 py-1.5 space-y-1">
-          <div className="flex items-center gap-2 font-mono text-[11px] tabular-nums tracking-tight text-[#ECEEF0]">
+        <div className="pointer-events-auto absolute bottom-3 left-3 z-10 max-w-[calc(100%-5rem)] sm:max-w-[78%] border border-line bg-ground/95 px-2.5 py-1.5 space-y-1">
+          <div className="flex items-center gap-2 font-mono text-[11px] tabular-nums tracking-tight text-ink">
             {drawnField ? (
               <>
-                <span className="text-emerald-400 shrink-0">{t.map.fieldLabel}:</span>
+                <span className="text-crop shrink-0">{t.map.fieldLabel}:</span>
                 <span className="shrink-0">{drawnField.areaHectares.toFixed(2)} ha</span>
-                <span aria-hidden="true" className="text-[#7C8490] shrink-0">
+                <span aria-hidden="true" className="text-ink-3 shrink-0">
                   ·
                 </span>
-                <span className="text-[#A1A8B3] shrink-0">
+                <span className="text-ink-2 shrink-0">
                   Ø {drawnField.samplePointsCount} {t.map.samplesSuffix}
                 </span>
-                <span aria-hidden="true" className="text-[#7C8490] shrink-0 hidden sm:inline">
+                <span aria-hidden="true" className="text-ink-3 shrink-0 hidden sm:inline">
                   ·
                 </span>
-                <span className="text-[#7C8490] hidden sm:inline truncate">
+                <span className="text-ink-3 hidden sm:inline truncate">
                   {lat.toFixed(4)}, {lon.toFixed(4)}
                 </span>
               </>
             ) : (
               <>
-                <span className="text-emerald-400 shrink-0">{t.map.pinLabel}:</span>
+                <span className="text-crop shrink-0">{t.map.pinLabel}:</span>
                 <span className="shrink-0">
                   {lat.toFixed(4)}, {lon.toFixed(4)}
                 </span>
-                <span aria-hidden="true" className="text-[#7C8490] shrink-0">
+                <span aria-hidden="true" className="text-ink-3 shrink-0">
                   ·
                 </span>
-                <span className="text-[#A1A8B3] truncate">{regionName}</span>
+                <span className="text-ink-2 truncate">{regionName}</span>
               </>
             )}
           </div>
 
           {!drawnField && (
-            <div className="flex items-center gap-1.5 text-[10px] font-mono text-[#7C8490]">
-              <span className="inline-block h-2 w-2 border border-emerald-400 bg-emerald-500/20 shrink-0" />
+            <div className="flex items-center gap-1.5 text-[10px] font-mono text-ink-3">
+              <span className="inline-block h-2 w-2 border border-crop bg-crop/20 shrink-0" />
               <span>{t.map.gridLegend}</span>
             </div>
           )}
 
           {activeTimeline && activeTimeline.tempC !== undefined && (
-            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 border-t border-[#262B33] pt-1 font-mono text-[10px] tabular-nums text-[#A1A8B3]">
-              <span className="text-emerald-300 font-semibold">
+            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 border-t border-line pt-1 font-mono text-[10px] tabular-nums text-ink-2">
+              <span className="text-crop font-semibold">
                 {activeTimeline.months.length > 1 ? 'Ø ' : ''}
                 {activeTimeline.periodLabel}
               </span>

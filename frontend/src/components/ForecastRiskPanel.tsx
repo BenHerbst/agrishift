@@ -105,15 +105,15 @@ export function ForecastRiskPanel({ forecast, status, error, onRetry, lang, t }:
   if (status === 'loading' || status === 'idle') {
     return (
       <div role="tabpanel" className="space-y-4">
-        <div className="flex items-start gap-3 border border-emerald-500/35 bg-emerald-500/10 px-4 py-3">
-          <RefreshCw className="h-4 w-4 mt-0.5 shrink-0 animate-spin text-emerald-300" aria-hidden="true" />
+        <div className="flex items-start gap-3 border border-crop/35 bg-crop/10 px-4 py-3">
+          <RefreshCw className="h-4 w-4 mt-0.5 shrink-0 animate-spin text-crop" aria-hidden="true" />
           <div>
-            <div className="text-sm font-semibold text-emerald-200">{ft.loadingTitle}</div>
-            <p className="mt-1 text-xs leading-relaxed text-[#A1A8B3]">{ft.loadingHint}</p>
+            <div className="text-sm font-semibold text-crop">{ft.loadingTitle}</div>
+            <p className="mt-1 text-xs leading-relaxed text-ink-2">{ft.loadingHint}</p>
           </div>
         </div>
-        <div className="h-40 w-full bg-[#111316] border border-[#262B33]" />
-        <div className="h-56 w-full bg-[#111316] border border-[#262B33]" />
+        <div className="h-40 w-full bg-ground border border-line" />
+        <div className="h-56 w-full bg-ground border border-line" />
       </div>
     );
   }
@@ -121,16 +121,16 @@ export function ForecastRiskPanel({ forecast, status, error, onRetry, lang, t }:
   if (status === 'error' || !forecast) {
     return (
       <div role="tabpanel" className="space-y-3">
-        <div className="flex items-start gap-3 border border-amber-500/40 bg-amber-500/10 px-4 py-3">
-          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-amber-300" aria-hidden="true" />
+        <div className="flex items-start gap-3 border border-warn/40 bg-warn/10 px-4 py-3">
+          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-warn" aria-hidden="true" />
           <div className="space-y-1.5 min-w-0">
-            <div className="text-sm font-semibold text-amber-200">{ft.errorTitle}</div>
-            {error && <p className="text-xs text-amber-100/90 break-words">{error}</p>}
-            <p className="font-mono text-[11px] text-[#A1A8B3]">{ft.errorHint}</p>
+            <div className="text-sm font-semibold text-warn">{ft.errorTitle}</div>
+            {error && <p className="text-xs text-warn break-words">{error}</p>}
+            <p className="font-mono text-[11px] text-ink-2">{ft.errorHint}</p>
             <button
               type="button"
               onClick={onRetry}
-              className="inline-flex items-center gap-1.5 rounded-[2px] border border-amber-500/50 px-2.5 py-1 text-xs text-amber-200 hover:bg-amber-500/20 cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-md border border-warn/50 px-2.5 py-1 text-xs text-warn hover:bg-warn/20 cursor-pointer"
             >
               <RefreshCw className="h-3 w-3" aria-hidden="true" />
               {ft.retry}
@@ -149,25 +149,25 @@ export function ForecastRiskPanel({ forecast, status, error, onRetry, lang, t }:
   return (
     <div role="tabpanel" className="space-y-5">
       {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#262B33] pb-3">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line pb-3">
         <div className="min-w-0">
-          <p className="text-[11px] text-[#7C8490]">{ft.kicker}</p>
-          <h3 className="mt-0.5 text-sm font-semibold text-[#ECEEF0]">{ft.title}</h3>
-          <p className="mt-0.5 text-xs text-[#A1A8B3]">{ft.subtitle}</p>
+          <p className="text-[11px] text-ink-3">{ft.kicker}</p>
+          <h3 className="mt-0.5 text-sm font-semibold text-ink">{ft.title}</h3>
+          <p className="mt-0.5 text-xs text-ink-2">{ft.subtitle}</p>
         </div>
-        <div className="font-mono text-[11px] tabular-nums text-[#A1A8B3] text-right shrink-0">
+        <div className="font-mono text-[11px] tabular-nums text-ink-2 text-right shrink-0">
           <div>
-            {ft.trainedUntil}: <span className="text-[#ECEEF0]">{forecast.trainedUntil}</span>
+            {ft.trainedUntil}: <span className="text-ink">{forecast.trainedUntil}</span>
           </div>
           <div>
-            {ft.horizon}: <span className="text-[#ECEEF0]">{forecast.horizonMonths}</span> {ft.monthsUnit}
+            {ft.horizon}: <span className="text-ink">{forecast.horizonMonths}</span> {ft.monthsUnit}
           </div>
         </div>
       </div>
 
       {src.climateProjectionErrors && (
         <div
-          className="flex items-start gap-2 border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200"
+          className="flex items-start gap-2 border border-warn/40 bg-warn/10 px-3 py-2 text-[11px] text-warn"
           title={src.climateProjectionErrors.join('\n')}
         >
           <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" aria-hidden="true" />
@@ -176,21 +176,21 @@ export function ForecastRiskPanel({ forecast, status, error, onRetry, lang, t }:
       )}
 
       {/* Year-by-year indicators */}
-      <div className="border border-[#262B33] bg-[#111316]">
-        <div className="border-b border-[#262B33] px-4 py-3">
-          <h4 className="text-xs font-semibold text-[#ECEEF0]">{ft.yearlyTitle}</h4>
-          <p className="text-[11px] text-[#7C8490]">{ft.yearlySubtitle}</p>
+      <div className="border border-line bg-ground">
+        <div className="border-b border-line px-4 py-3">
+          <h4 className="text-xs font-semibold text-ink">{ft.yearlyTitle}</h4>
+          <p className="text-[11px] text-ink-3">{ft.yearlySubtitle}</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="border-b border-[#262B33] text-[#A1A8B3]">
+              <tr className="border-b border-line text-ink-2">
                 <th className="px-4 py-2 text-left font-medium" />
                 {forecast.agriSummary.map((y) => (
-                  <th key={y.year} className="px-3 py-2 text-right font-mono font-semibold text-[#ECEEF0] whitespace-nowrap">
+                  <th key={y.year} className="px-3 py-2 text-right font-mono font-semibold text-ink whitespace-nowrap">
                     {y.year}
                     {!y.completeYear && (
-                      <div className="font-sans text-[10px] font-normal text-[#7C8490]">
+                      <div className="font-sans text-[10px] font-normal text-ink-3">
                         {ft.incompleteYear} · {y.monthsCovered}
                       </div>
                     )}
@@ -200,13 +200,13 @@ export function ForecastRiskPanel({ forecast, status, error, onRetry, lang, t }:
             </thead>
             <tbody>
               {YEARLY_INDICATORS.map((key) => (
-                <tr key={key} className="border-b border-[#262B33] last:border-b-0">
-                  <td className="px-4 py-2 text-[#A1A8B3] whitespace-nowrap">{ft.indicators[key]}</td>
+                <tr key={key} className="border-b border-line last:border-b-0">
+                  <td className="px-4 py-2 text-ink-2 whitespace-nowrap">{ft.indicators[key]}</td>
                   {forecast.agriSummary.map((y) => {
                     const ind = y.indicators[key];
                     if (!ind) {
                       return (
-                        <td key={y.year} className="px-3 py-2 text-right text-[#7C8490]">
+                        <td key={y.year} className="px-3 py-2 text-right text-ink-3">
                           —
                         </td>
                       );
@@ -216,10 +216,10 @@ export function ForecastRiskPanel({ forecast, status, error, onRetry, lang, t }:
                       (NEGATIVE_IS_STRESS.has(key) && ind.anomaly < 0);
                     return (
                       <td key={y.year} className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap">
-                        <div className="text-[#ECEEF0]">
-                          {fmt(ind.forecast, ind.unit)} <span className="text-[10px] text-[#7C8490]">{ind.unit}</span>
+                        <div className="text-ink">
+                          {fmt(ind.forecast, ind.unit)} <span className="text-[10px] text-ink-3">{ind.unit}</span>
                         </div>
-                        <div className={`text-[10px] ${stress ? 'text-amber-300' : 'text-[#7C8490]'}`}>
+                        <div className={`text-[10px] ${stress ? 'text-warn' : 'text-ink-3'}`}>
                           {signed(ind.anomaly, ind.unit)} vs. {ft.normalShort}
                         </div>
                       </td>
@@ -230,15 +230,15 @@ export function ForecastRiskPanel({ forecast, status, error, onRetry, lang, t }:
             </tbody>
           </table>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-[#262B33] border-t border-[#262B33]">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-line border-t border-line">
           {forecast.agriSummary.map((y) => (
-            <div key={y.year} className="bg-[#111316] px-4 py-2.5 text-[11px] text-[#A1A8B3]">
-              <div className="font-mono font-semibold text-[#ECEEF0]">
+            <div key={y.year} className="bg-ground px-4 py-2.5 text-[11px] text-ink-2">
+              <div className="font-mono font-semibold text-ink">
                 {y.year} · {y.frostFreeMonths} {ft.frostFreeMonths}
               </div>
               <div className="mt-0.5">
                 {ft.deficitMonths}:{' '}
-                <span className="font-mono text-amber-200">
+                <span className="font-mono text-warn">
                   {y.deficitMonths.length === 0
                     ? ft.noDeficit
                     : y.deficitMonths.map((m) => monthNames[Number(m.slice(5, 7)) - 1]).join(' · ')}
@@ -250,12 +250,12 @@ export function ForecastRiskPanel({ forecast, status, error, onRetry, lang, t }:
       </div>
 
       {/* Seasonal risk */}
-      <div className="border border-[#262B33] bg-[#111316]">
-        <div className="border-b border-[#262B33] px-4 py-3">
-          <h4 className="text-xs font-semibold text-[#ECEEF0]">{ft.riskTitle}</h4>
-          <p className="text-[11px] text-[#7C8490]">{ft.riskSubtitle}</p>
+      <div className="border border-line bg-ground">
+        <div className="border-b border-line px-4 py-3">
+          <h4 className="text-xs font-semibold text-ink">{ft.riskTitle}</h4>
+          <p className="text-[11px] text-ink-3">{ft.riskSubtitle}</p>
         </div>
-        <div className="divide-y divide-[#262B33]">
+        <div className="divide-y divide-line">
           {forecast.risk.map((season) => {
             const seasonLabel =
               ft.seasons[season.seasonName as keyof typeof ft.seasons] ?? season.seasonName;
@@ -263,21 +263,21 @@ export function ForecastRiskPanel({ forecast, status, error, onRetry, lang, t }:
             return (
               <div key={season.season} className="px-4 py-3 space-y-2">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <span className="font-mono text-xs font-semibold text-[#ECEEF0]">
+                  <span className="font-mono text-xs font-semibold text-ink">
                     {seasonLabel} {season.seasonYear}
                   </span>
                   <span
-                    className="inline-flex items-center gap-1 font-mono text-[11px] tabular-nums text-[#A1A8B3]"
+                    className="inline-flex items-center gap-1 font-mono text-[11px] tabular-nums text-ink-2"
                     title={ft.deficitNote}
                   >
-                    <Droplets className="h-3 w-3 text-sky-300" aria-hidden="true" />
-                    {ft.deficitTitle}: <span className="text-[#ECEEF0]">{wd.typical} mm</span> {ft.deficitTypical}
+                    <Droplets className="h-3 w-3 text-water" aria-hidden="true" />
+                    {ft.deficitTitle}: <span className="text-ink">{wd.typical} mm</span> {ft.deficitTypical}
                     {' · '}
-                    <span className="text-amber-200">{wd.dryYear1in5} mm</span> {ft.deficitDry}
+                    <span className="text-warn">{wd.dryYear1in5} mm</span> {ft.deficitDry}
                     {' · '}
                     {wd.extreme1in10} mm {ft.deficitExtreme}
                     {' · '}
-                    <span className="text-[#7C8490]">
+                    <span className="text-ink-3">
                       {wd.normalTypical} mm {ft.deficitNormal}
                     </span>
                   </span>
@@ -287,7 +287,7 @@ export function ForecastRiskPanel({ forecast, status, error, onRetry, lang, t }:
                     const ev = season.events[id];
                     if (!ev) {
                       return (
-                        <div key={id} className="text-[11px] text-[#7C8490]">
+                        <div key={id} className="text-[11px] text-ink-3">
                           {ft.events[id]}: —
                         </div>
                       );
@@ -297,27 +297,27 @@ export function ForecastRiskPanel({ forecast, status, error, onRetry, lang, t }:
                     return (
                       <div key={id} title={ft.eventHints[id]} className="space-y-1">
                         <div className="flex items-baseline justify-between text-[11px]">
-                          <span className="text-[#A1A8B3]">{ft.events[id]}</span>
+                          <span className="text-ink-2">{ft.events[id]}</span>
                           <span
                             className={`font-mono font-semibold tabular-nums ${
-                              elevated ? 'text-amber-300' : 'text-[#ECEEF0]'
+                              elevated ? 'text-warn' : 'text-ink'
                             }`}
                           >
                             {p}%
                           </span>
                         </div>
-                        <div className="relative h-1.5 w-full bg-[#262B33]">
+                        <div className="relative h-1.5 w-full bg-line">
                           <div
-                            className={`absolute inset-y-0 left-0 ${elevated ? 'bg-amber-500/80' : 'bg-emerald-500/70'}`}
+                            className={`absolute inset-y-0 left-0 ${elevated ? 'bg-warn/80' : 'bg-crop/70'}`}
                             style={{ width: `${p}%` }}
                           />
                           <div
-                            className="absolute -top-0.5 -bottom-0.5 w-px bg-[#ECEEF0]"
+                            className="absolute -top-0.5 -bottom-0.5 w-px bg-ink"
                             style={{ left: `${Math.round(ev.normalProbability * 100)}%` }}
                             aria-hidden="true"
                           />
                         </div>
-                        <div className="font-mono text-[10px] tabular-nums text-[#7C8490]">
+                        <div className="font-mono text-[10px] tabular-nums text-ink-3">
                           {ft.normalOdds} {Math.round(ev.normalProbability * 100)}% · {ft.recentOdds}{' '}
                           {Math.round(ev.observedRecent * 100)}%
                         </div>
@@ -332,13 +332,13 @@ export function ForecastRiskPanel({ forecast, status, error, onRetry, lang, t }:
       </div>
 
       {/* Monthly forecast chart */}
-      <div className="border border-[#262B33] bg-[#111316] p-4 space-y-3">
+      <div className="border border-line bg-ground p-4 space-y-3">
         <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h4 className="text-xs font-semibold text-[#ECEEF0]">
+            <h4 className="text-xs font-semibold text-ink">
               {ft.monthlyTitle} · {ft.indicators[monthlyVar]}
             </h4>
-            <p className="text-[11px] text-[#7C8490]">
+            <p className="text-[11px] text-ink-3">
               {ft.monthlySubtitle} ({monthlyUnit}) ·{' '}
               <span title={ft.skillHint}>
                 {ft.skillLabel}:{' '}
@@ -347,8 +347,8 @@ export function ForecastRiskPanel({ forecast, status, error, onRetry, lang, t }:
                     monthlySkill === null
                       ? ''
                       : monthlySkill > 0
-                      ? 'text-emerald-300'
-                      : 'text-amber-300'
+                      ? 'text-crop'
+                      : 'text-warn'
                   }
                 >
                   {monthlySkill === null
@@ -365,7 +365,7 @@ export function ForecastRiskPanel({ forecast, status, error, onRetry, lang, t }:
             id="forecast-monthly-variable"
             value={monthlyVar}
             onChange={(e) => setMonthlyVar(e.target.value as BackendVariable)}
-            className="rounded-[2px] border border-[#262B33] bg-[#171A1F] px-2.5 py-1 text-xs text-[#ECEEF0] focus:border-emerald-400 focus:outline-none"
+            className="rounded-md border border-line bg-panel px-2.5 py-1 text-xs text-ink focus:border-crop focus:outline-none"
           >
             {MONTHLY_VARIABLES.filter((v) => forecast.variables[v]).map((v) => (
               <option key={v} value={v}>
@@ -378,21 +378,21 @@ export function ForecastRiskPanel({ forecast, status, error, onRetry, lang, t }:
         <div className="h-[240px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={monthlyData} margin={{ top: 8, right: 12, left: 2, bottom: 2 }}>
-              <CartesianGrid stroke="#262B33" strokeDasharray="3 3" vertical={false} />
+              <CartesianGrid stroke="var(--color-line)" strokeDasharray="3 3" vertical={false} />
               <XAxis
                 dataKey="label"
-                stroke="#7C8490"
+                stroke="var(--color-ink-3)"
                 interval={2}
-                tick={{ fill: '#A1A8B3', fontSize: 10, fontFamily: 'JetBrains Mono, monospace' }}
+                tick={{ fill: 'var(--color-ink-2)', fontSize: 10, fontFamily: 'Archivo, sans-serif' }}
                 tickLine={false}
-                axisLine={{ stroke: '#262B33' }}
+                axisLine={{ stroke: 'var(--color-line)' }}
               />
               <YAxis
-                stroke="#7C8490"
+                stroke="var(--color-ink-3)"
                 width={46}
-                tick={{ fill: '#A1A8B3', fontSize: 10, fontFamily: 'JetBrains Mono, monospace' }}
+                tick={{ fill: 'var(--color-ink-2)', fontSize: 10, fontFamily: 'Archivo, sans-serif' }}
                 tickLine={false}
-                axisLine={{ stroke: '#262B33' }}
+                axisLine={{ stroke: 'var(--color-line)' }}
                 tickFormatter={(v: number) => fmt(v, monthlyUnit)}
               />
               <Tooltip
@@ -400,22 +400,22 @@ export function ForecastRiskPanel({ forecast, status, error, onRetry, lang, t }:
                   if (!active || !payload || payload.length === 0) return null;
                   const pt = payload[0].payload as (typeof monthlyData)[number];
                   return (
-                    <div className="border border-[#262B33] bg-[#111316] px-3 py-2 text-xs font-mono tabular-nums text-[#ECEEF0]">
-                      <div className="font-semibold border-b border-[#262B33] pb-1 mb-1">{pt.month}</div>
-                      <div className="flex justify-between gap-4 text-emerald-300">
+                    <div className="border border-line bg-ground px-3 py-2 text-xs font-mono tabular-nums text-ink">
+                      <div className="font-semibold border-b border-line pb-1 mb-1">{pt.month}</div>
+                      <div className="flex justify-between gap-4 text-crop">
                         <span>{ft.legendForecast}</span>
                         <span>
                           {fmt(pt.forecast, monthlyUnit)} {monthlyUnit}
                         </span>
                       </div>
-                      <div className="flex justify-between gap-4 text-[#A1A8B3]">
+                      <div className="flex justify-between gap-4 text-ink-2">
                         <span>{ft.legendRange}</span>
                         <span>
                           {fmt(pt.lower, monthlyUnit)}–{fmt(pt.upper, monthlyUnit)}
                         </span>
                       </div>
                       {pt.normal !== null && (
-                        <div className="flex justify-between gap-4 text-[#A1A8B3]">
+                        <div className="flex justify-between gap-4 text-ink-2">
                           <span>{ft.legendNormal}</span>
                           <span>{fmt(pt.normal, monthlyUnit)}</span>
                         </div>
@@ -428,14 +428,14 @@ export function ForecastRiskPanel({ forecast, status, error, onRetry, lang, t }:
                 type="monotone"
                 dataKey="band"
                 stroke="none"
-                fill="#10b981"
+                fill="var(--color-crop)"
                 fillOpacity={0.16}
                 isAnimationActive={false}
               />
               <Line
                 type="monotone"
                 dataKey="normal"
-                stroke="#7C8490"
+                stroke="var(--color-ink-3)"
                 strokeWidth={1.25}
                 strokeDasharray="3 3"
                 dot={false}
@@ -445,7 +445,7 @@ export function ForecastRiskPanel({ forecast, status, error, onRetry, lang, t }:
               <Line
                 type="monotone"
                 dataKey="forecast"
-                stroke="#10b981"
+                stroke="var(--color-crop)"
                 strokeWidth={2}
                 dot={false}
                 isAnimationActive={false}
@@ -454,18 +454,18 @@ export function ForecastRiskPanel({ forecast, status, error, onRetry, lang, t }:
           </ResponsiveContainer>
         </div>
 
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 border-t border-[#262B33] pt-2.5 text-[11px] text-[#A1A8B3]">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 border-t border-line pt-2.5 text-[11px] text-ink-2">
           <span className="inline-flex items-center gap-1.5">
-            <span className="h-0.5 w-3.5 bg-emerald-500" />
+            <span className="h-0.5 w-3.5 bg-crop" />
             {ft.legendForecast}
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <span className="h-2.5 w-3.5 border border-emerald-500/45 bg-emerald-500/20" />
+            <span className="h-2.5 w-3.5 border border-crop/45 bg-crop/20" />
             {ft.legendRange}
           </span>
           {monthlyData.some((d) => d.normal !== null) && (
             <span className="inline-flex items-center gap-1.5">
-              <span className="h-0.5 w-3.5 border-t border-dashed border-[#7C8490]" />
+              <span className="h-0.5 w-3.5 border-t border-dashed border-ink-3" />
               {ft.legendNormal}
             </span>
           )}
@@ -473,22 +473,22 @@ export function ForecastRiskPanel({ forecast, status, error, onRetry, lang, t }:
       </div>
 
       {/* Sources & disclaimer */}
-      <div className="border border-[#262B33] bg-[#111316] px-4 py-3 space-y-2 text-[11px]">
-        <div className="text-xs font-semibold text-[#ECEEF0]">{ft.sourcesTitle}</div>
-        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-[#A1A8B3]">
+      <div className="border border-line bg-ground px-4 py-3 space-y-2 text-[11px]">
+        <div className="text-xs font-semibold text-ink">{ft.sourcesTitle}</div>
+        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-ink-2">
           <div>
             <dt className="inline">{ft.sourceHistory}: </dt>
-            <dd className="inline text-[#ECEEF0]">{src.history ?? ft.none}</dd>
+            <dd className="inline text-ink">{src.history ?? ft.none}</dd>
           </div>
           <div>
             <dt className="inline">{ft.sourceProjections}: </dt>
-            <dd className="inline font-mono text-[#ECEEF0]">
+            <dd className="inline font-mono text-ink">
               {src.climateProjections?.join(', ') ?? ft.none}
             </dd>
           </div>
           <div>
             <dt className="inline">{ft.sourceIndices}: </dt>
-            <dd className="inline font-mono text-[#ECEEF0]">
+            <dd className="inline font-mono text-ink">
               {src.climateIndices
                 ? Object.entries(src.climateIndices)
                     .map(([k, v]) => `${k} ${v}`)
@@ -498,18 +498,18 @@ export function ForecastRiskPanel({ forecast, status, error, onRetry, lang, t }:
           </div>
           <div>
             <dt className="inline">{ft.sourceSeasonal}: </dt>
-            <dd className="inline text-[#ECEEF0]">{src.seasonalForecast ?? ft.none}</dd>
+            <dd className="inline text-ink">{src.seasonalForecast ?? ft.none}</dd>
           </div>
           <div>
             <dt className="inline">{ft.sourceStation}: </dt>
-            <dd className="inline text-[#ECEEF0]">{src.stationCalibration?.join(', ') ?? ft.none}</dd>
+            <dd className="inline text-ink">{src.stationCalibration?.join(', ') ?? ft.none}</dd>
           </div>
           <div>
             <dt className="inline">{ft.sourceProphet}: </dt>
-            <dd className="inline text-[#ECEEF0]">{src.prophetMember ? ft.yes : ft.no}</dd>
+            <dd className="inline text-ink">{src.prophetMember ? ft.yes : ft.no}</dd>
           </div>
         </dl>
-        <p className="border-t border-[#262B33] pt-2 leading-relaxed text-[#7C8490]">{ft.disclaimer}</p>
+        <p className="border-t border-line pt-2 leading-relaxed text-ink-3">{ft.disclaimer}</p>
       </div>
     </div>
   );

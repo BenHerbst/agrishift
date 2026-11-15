@@ -165,13 +165,13 @@ export function RightDataPanel({
         (selectedVariable === 'EVLAND' && stats.direction === 'increasing'))
   );
 
-  const lineAccent = isNegativeWarning ? '#d97706' : '#10b981';
+  const lineAccent = isNegativeWarning ? 'var(--color-warn)' : 'var(--color-crop)';
 
   return (
-    <div className="flex flex-col bg-[#171A1F] h-full min-w-0">
+    <div className="flex flex-col bg-panel h-full min-w-0 lg:min-h-0">
       {/* Three Clean Flat Tabs */}
       <div
-        className="flex items-stretch overflow-x-auto border-b border-[#262B33] bg-[#111316]"
+        className="flex items-stretch overflow-x-auto border-b border-line bg-ground"
         role="tablist"
         aria-label={t.rightPanel.tabListLabel}
       >
@@ -180,10 +180,10 @@ export function RightDataPanel({
           role="tab"
           aria-selected={activeTab === 'trends'}
           onClick={() => onSelectTab('trends')}
-          className={`px-4 sm:px-5 py-3 text-xs font-medium transition-colors duration-200 ease-out whitespace-nowrap shrink-0 cursor-pointer border-r border-[#262B33] border-b-2 ${
+          className={`px-4 sm:px-5 py-3 text-xs font-medium transition-colors duration-200 ease-out whitespace-nowrap shrink-0 cursor-pointer border-r border-line border-b-2 ${
             activeTab === 'trends'
-              ? 'border-b-emerald-400 bg-[#171A1F] text-[#ECEEF0]'
-              : 'border-b-transparent bg-[#111316] text-[#A1A8B3] hover:text-[#ECEEF0]'
+              ? 'border-b-crop bg-panel text-ink'
+              : 'border-b-transparent bg-ground text-ink-2 hover:text-ink'
           }`}
         >
           {t.rightPanel.tabTrends}
@@ -194,10 +194,10 @@ export function RightDataPanel({
           role="tab"
           aria-selected={activeTab === 'forecast'}
           onClick={() => onSelectTab('forecast')}
-          className={`px-4 sm:px-5 py-3 text-xs font-medium transition-colors duration-200 ease-out whitespace-nowrap shrink-0 cursor-pointer border-r border-[#262B33] border-b-2 ${
+          className={`px-4 sm:px-5 py-3 text-xs font-medium transition-colors duration-200 ease-out whitespace-nowrap shrink-0 cursor-pointer border-r border-line border-b-2 ${
             activeTab === 'forecast'
-              ? 'border-b-emerald-400 bg-[#171A1F] text-[#ECEEF0]'
-              : 'border-b-transparent bg-[#111316] text-[#A1A8B3] hover:text-[#ECEEF0]'
+              ? 'border-b-crop bg-panel text-ink'
+              : 'border-b-transparent bg-ground text-ink-2 hover:text-ink'
           }`}
         >
           {t.rightPanel.tabForecast}
@@ -208,10 +208,10 @@ export function RightDataPanel({
           role="tab"
           aria-selected={activeTab === 'field_shift'}
           onClick={() => onSelectTab('field_shift')}
-          className={`px-4 sm:px-5 py-3 text-xs font-medium transition-colors duration-200 ease-out whitespace-nowrap shrink-0 cursor-pointer border-r border-[#262B33] border-b-2 ${
+          className={`px-4 sm:px-5 py-3 text-xs font-medium transition-colors duration-200 ease-out whitespace-nowrap shrink-0 cursor-pointer border-r border-line border-b-2 ${
             activeTab === 'field_shift'
-              ? 'border-b-emerald-400 bg-[#171A1F] text-[#ECEEF0]'
-              : 'border-b-transparent bg-[#111316] text-[#A1A8B3] hover:text-[#ECEEF0]'
+              ? 'border-b-crop bg-panel text-ink'
+              : 'border-b-transparent bg-ground text-ink-2 hover:text-ink'
           }`}
         >
           {t.rightPanel.tabFieldShift}
@@ -222,10 +222,10 @@ export function RightDataPanel({
           role="tab"
           aria-selected={activeTab === 'summary'}
           onClick={() => onSelectTab('summary')}
-          className={`px-4 sm:px-5 py-3 text-xs font-medium transition-colors duration-200 ease-out whitespace-nowrap shrink-0 cursor-pointer border-r border-[#262B33] border-b-2 ${
+          className={`px-4 sm:px-5 py-3 text-xs font-medium transition-colors duration-200 ease-out whitespace-nowrap shrink-0 cursor-pointer border-r border-line border-b-2 ${
             activeTab === 'summary'
-              ? 'border-b-emerald-400 bg-[#171A1F] text-[#ECEEF0]'
-              : 'border-b-transparent bg-[#111316] text-[#A1A8B3] hover:text-[#ECEEF0]'
+              ? 'border-b-crop bg-panel text-ink'
+              : 'border-b-transparent bg-ground text-ink-2 hover:text-ink'
           }`}
         >
           {t.rightPanel.tabSummary}
@@ -233,17 +233,17 @@ export function RightDataPanel({
       </div>
 
       {/* Tab Content */}
-      <div className="flex-1 p-4 sm:p-5 flex flex-col gap-5 min-w-0">
+      <div className="flex-1 p-4 sm:p-5 flex flex-col gap-5 min-w-0 lg:min-h-0 lg:overflow-y-auto">
         {!isLoading && dataset?.fieldAreaStats && (
-          <div className="flex flex-wrap items-center justify-between gap-2 border border-emerald-500/35 bg-emerald-500/10 px-3.5 py-2 text-xs">
-            <div className="flex items-center gap-2 text-emerald-300 font-medium">
+          <div className="flex flex-wrap items-center justify-between gap-2 border border-crop/35 bg-crop/10 px-3.5 py-2 text-xs">
+            <div className="flex items-center gap-2 text-crop font-medium">
               <span>
                 {lang === 'de'
                   ? `Ø Feld-Durchschnitt (${dataset.fieldAreaStats.areaHectares.toFixed(2)} ha)`
                   : `Field Average (${dataset.fieldAreaStats.areaHectares.toFixed(2)} ha)`}
               </span>
             </div>
-            <div className="font-mono text-[11px] tabular-nums text-[#ECEEF0]">
+            <div className="font-mono text-[11px] tabular-nums text-ink">
               {lang === 'de'
                 ? `${dataset.fieldAreaStats.samplePointsCount} Messpunkte gemittelt · Umfang ${dataset.fieldAreaStats.perimeterMeters} m`
                 : `${dataset.fieldAreaStats.samplePointsCount} sample points averaged · perimeter ${dataset.fieldAreaStats.perimeterMeters} m`}
@@ -252,9 +252,9 @@ export function RightDataPanel({
         )}
         {isLoading || !dataset || !stats ? (
           <div className="space-y-4">
-            <div className="h-9 w-full bg-[#111316] border border-[#262B33]" />
-            <div className="h-24 w-full bg-[#111316] border border-[#262B33]" />
-            <div className="h-[290px] w-full bg-[#111316] border border-[#262B33]" />
+            <div className="h-9 w-full bg-ground border border-line" />
+            <div className="h-24 w-full bg-ground border border-line" />
+            <div className="h-[290px] w-full bg-ground border border-line" />
           </div>
         ) : activeTab === 'trends' ? (
           <TrendsTabView
@@ -371,10 +371,10 @@ function SummaryTabView({
 
   return (
     <div role="tabpanel" className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#262B33] pb-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
         <div>
-          <h3 className="text-sm font-semibold text-[#ECEEF0]">{t.drawer.title}</h3>
-          <p className="text-xs text-[#A1A8B3] mt-0.5">
+          <h3 className="text-sm font-semibold text-ink">{t.drawer.title}</h3>
+          <p className="text-xs text-ink-2 mt-0.5">
             {isLoading
               ? t.drawer.loadingSubtitle
               : briefing
@@ -390,7 +390,7 @@ function SummaryTabView({
             type="button"
             onClick={onRegenerate}
             disabled={isLoading}
-            className="inline-flex items-center gap-1.5 rounded-[2px] border border-[#262B33] bg-[#111316] px-3 py-1.5 text-xs text-[#ECEEF0] hover:border-[#3A414D] transition-colors duration-200 ease-out cursor-pointer disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-md border border-line bg-ground px-3 py-1.5 text-xs text-ink hover:border-line-strong transition-colors duration-200 ease-out cursor-pointer disabled:opacity-50"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} aria-hidden="true" />
             <span>{t.drawer.regenerate}</span>
@@ -400,7 +400,7 @@ function SummaryTabView({
             type="button"
             onClick={handleCopy}
             disabled={!briefing || isLoading}
-            className="inline-flex items-center gap-1.5 rounded-[2px] border border-emerald-500/45 bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-[#111316] hover:bg-emerald-400 transition-colors duration-200 ease-out cursor-pointer disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-md border border-crop/45 bg-crop px-3 py-1.5 text-xs font-semibold text-ground hover:bg-crop/90 transition-colors duration-200 ease-out cursor-pointer disabled:opacity-50"
           >
             {copied ? (
               <>
@@ -419,32 +419,32 @@ function SummaryTabView({
 
       {isLoading ? (
         <div className="space-y-4">
-          <div className="h-24 bg-[#111316] border border-[#262B33]" />
-          <div className="h-32 bg-[#111316] border border-[#262B33]" />
-          <div className="h-32 bg-[#111316] border border-[#262B33]" />
+          <div className="h-24 bg-ground border border-line" />
+          <div className="h-32 bg-ground border border-line" />
+          <div className="h-32 bg-ground border border-line" />
         </div>
       ) : error ? (
-        <div className="rounded-[2px] border border-amber-500/40 bg-amber-500/10 p-4 text-xs text-amber-200">
+        <div className="rounded-md border border-warn/40 bg-warn/10 p-4 text-xs text-warn">
           {error}
         </div>
       ) : briefing ? (
         <div className="space-y-5">
-          <div className="border border-[#262B33] bg-[#111316] p-4 sm:p-5">
-            <h4 className="text-base font-semibold text-[#ECEEF0] text-balance">
+          <div className="border border-line bg-ground p-4 sm:p-5">
+            <h4 className="text-base font-semibold text-ink text-balance">
               {briefing.headline}
             </h4>
-            <p className="mt-2 text-sm leading-relaxed text-[#A1A8B3]">
+            <p className="mt-2 text-sm leading-relaxed text-ink-2">
               {briefing.executiveSummary}
             </p>
           </div>
 
           <div className="space-y-2">
-            <h4 className="text-xs font-semibold text-[#ECEEF0]">{t.drawer.section1}</h4>
-            <ul className="divide-y divide-[#262B33] border border-[#262B33] bg-[#111316]">
+            <h4 className="text-xs font-semibold text-ink">{t.drawer.section1}</h4>
+            <ul className="divide-y divide-line border border-line bg-ground">
               {briefing.climateSignalFindings.map((item, idx) => (
                 <li
                   key={idx}
-                  className="px-4 py-2.5 text-xs leading-relaxed text-[#ECEEF0] font-mono tabular-nums tracking-tight"
+                  className="px-4 py-2.5 text-xs leading-relaxed text-ink font-mono tabular-nums tracking-tight"
                 >
                   {item}
                 </li>
@@ -454,10 +454,10 @@ function SummaryTabView({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <h4 className="text-xs font-semibold text-emerald-400">{t.drawer.section2}</h4>
-              <ul className="divide-y divide-[#262B33] border border-[#262B33] bg-[#111316]">
+              <h4 className="text-xs font-semibold text-crop">{t.drawer.section2}</h4>
+              <ul className="divide-y divide-line border border-line bg-ground">
                 {briefing.recommendedActionPlan.map((item, idx) => (
-                  <li key={idx} className="px-4 py-2.5 text-xs leading-relaxed text-[#ECEEF0]">
+                  <li key={idx} className="px-4 py-2.5 text-xs leading-relaxed text-ink">
                     {item}
                   </li>
                 ))}
@@ -465,10 +465,10 @@ function SummaryTabView({
             </div>
 
             <div className="space-y-2">
-              <h4 className="text-xs font-semibold text-amber-400">{t.drawer.section3}</h4>
-              <ul className="divide-y divide-[#262B33] border border-[#262B33] bg-[#111316]">
+              <h4 className="text-xs font-semibold text-warn">{t.drawer.section3}</h4>
+              <ul className="divide-y divide-line border border-line bg-ground">
                 {briefing.validationChecklist.map((item, idx) => (
-                  <li key={idx} className="px-4 py-2.5 text-xs leading-relaxed text-[#A1A8B3]">
+                  <li key={idx} className="px-4 py-2.5 text-xs leading-relaxed text-ink-2">
                     {item}
                   </li>
                 ))}
@@ -552,10 +552,10 @@ function TrendsTabView({
   );
 
   const badgeStyles = !stats.isSignificant
-    ? 'border-[#262B33] bg-[#111316] text-[#A1A8B3]'
+    ? 'border-line bg-ground text-ink-2'
     : isNegativeWarning
-    ? 'border-amber-500/40 bg-amber-500/12 text-amber-300'
-    : 'border-emerald-500/40 bg-emerald-500/12 text-emerald-300';
+    ? 'border-warn/40 bg-warn/12 text-warn'
+    : 'border-crop/40 bg-crop/12 text-crop';
 
   const TrendIcon = !stats.isSignificant
     ? Minus
@@ -614,7 +614,7 @@ function TrendsTabView({
     <div role="tabpanel" className="space-y-5">
       {/* Variable & Seasonal Window Filters */}
       <div className="flex flex-col gap-2.5 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex flex-wrap items-center gap-px border border-[#262B33] bg-[#262B33]">
+        <div className="flex flex-wrap items-center gap-px border border-line bg-line">
           {VARIABLES.map((v) => {
             const active = v === selectedVariable;
             return (
@@ -624,8 +624,8 @@ function TrendsTabView({
                 onClick={() => onSelectVariable(v)}
                 className={`px-3 py-1.5 text-xs transition-colors duration-200 ease-out whitespace-nowrap shrink-0 cursor-pointer ${
                   active
-                    ? 'bg-[#222730] text-emerald-300 font-medium'
-                    : 'bg-[#111316] text-[#A1A8B3] hover:text-[#ECEEF0]'
+                    ? 'bg-raised text-crop font-medium'
+                    : 'bg-ground text-ink-2 hover:text-ink'
                 }`}
               >
                 {VARIABLE_TEXT[lang][v].shortLabel}
@@ -634,7 +634,7 @@ function TrendsTabView({
           })}
         </div>
 
-        <div className="flex flex-wrap items-center gap-px border border-[#262B33] bg-[#262B33]">
+        <div className="flex flex-wrap items-center gap-px border border-line bg-line">
           {WINDOWS.map((w) => {
             const active = w === seasonalWindow;
             return (
@@ -644,8 +644,8 @@ function TrendsTabView({
                 onClick={() => onSelectWindow(w)}
                 className={`px-2.5 py-1.5 text-xs transition-colors duration-200 ease-out whitespace-nowrap shrink-0 cursor-pointer ${
                   active
-                    ? 'bg-[#222730] text-[#ECEEF0] font-medium'
-                    : 'bg-[#111316] text-[#A1A8B3] hover:text-[#ECEEF0]'
+                    ? 'bg-raised text-ink font-medium'
+                    : 'bg-ground text-ink-2 hover:text-ink'
                 }`}
               >
                 {windowText[w].shortLabel}
@@ -656,11 +656,11 @@ function TrendsTabView({
       </div>
 
       {/* Asymmetric Verdict + 3-Metric Strip */}
-      <div className="border border-[#262B33] bg-[#111316]">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#262B33] px-4 py-3">
+      <div className="border border-line bg-ground">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3">
           <div className="flex items-center gap-2.5">
             <span
-              className={`inline-flex items-center gap-1.5 rounded-[2px] border px-2.5 py-1 text-xs font-medium ${badgeStyles}`}
+              className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium ${badgeStyles}`}
             >
               {stats.isSignificant ? (
                 isNegativeWarning ? (
@@ -674,56 +674,56 @@ function TrendsTabView({
               <span>{localizedClass}</span>
             </span>
           </div>
-          <span className="font-mono text-xs tabular-nums text-[#A1A8B3]">
+          <span className="font-mono text-xs tabular-nums text-ink-2">
             {stats.startYear}–{periodEndLabel} · n = {stats.sampleCount} {t.trends.yearsSuffix} · {windowText[seasonalWindow].shortLabel}
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-[#262B33]">
-          <div className="bg-[#111316] px-4 py-3.5">
-            <div className="text-xs text-[#A1A8B3]">{t.trends.kpiSens}</div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-line">
+          <div className="bg-ground px-4 py-3.5">
+            <div className="text-xs text-ink-2">{t.trends.kpiSens}</div>
             <div className="mt-1 flex items-baseline gap-1.5">
-              <span className="font-mono text-xl font-semibold tabular-nums tracking-tight text-[#ECEEF0]">
+              <span className="font-mono text-xl font-semibold tabular-nums tracking-tight text-ink">
                 {slopeSign}
                 {stats.sensSlopePerDecade.toFixed(decimals)}
               </span>
-              <span className="font-mono text-xs tabular-nums text-[#A1A8B3]">
+              <span className="font-mono text-xs tabular-nums text-ink-2">
                 {unit} {t.trends.perDecade}
               </span>
             </div>
-            <div className="mt-1 font-mono text-[11px] tabular-nums text-[#7C8490]">
+            <div className="mt-1 font-mono text-[11px] tabular-nums text-ink-3">
               {t.trends.olsSlope}: {stats.olsSlopePerDecade >= 0 ? '+' : ''}
               {stats.olsSlopePerDecade.toFixed(decimals)}
             </div>
           </div>
 
-          <div className="bg-[#111316] px-4 py-3.5">
-            <div className="text-xs text-[#A1A8B3]">{t.trends.kpiMk}</div>
+          <div className="bg-ground px-4 py-3.5">
+            <div className="text-xs text-ink-2">{t.trends.kpiMk}</div>
             <div className="mt-1 flex items-baseline gap-2.5">
-              <span className="font-mono text-xl font-semibold tabular-nums tracking-tight text-[#ECEEF0]">
+              <span className="font-mono text-xl font-semibold tabular-nums tracking-tight text-ink">
                 Z = {stats.mannKendallZ >= 0 ? '+' : ''}
                 {stats.mannKendallZ.toFixed(2)}
               </span>
-              <span className="font-mono text-xs tabular-nums text-[#A1A8B3]">
+              <span className="font-mono text-xs tabular-nums text-ink-2">
                 p {pFormatted.startsWith('<') ? pFormatted : `= ${pFormatted}`}
               </span>
             </div>
-            <div className="mt-1 font-mono text-[11px] tabular-nums text-[#7C8490]">
+            <div className="mt-1 font-mono text-[11px] tabular-nums text-ink-3">
               S = {stats.mannKendallS} · Var = {Math.round(stats.mannKendallVarS)}
             </div>
           </div>
 
-          <div className="bg-[#111316] px-4 py-3.5">
-            <div className="text-xs text-[#A1A8B3]">{t.trends.kpiConf}</div>
+          <div className="bg-ground px-4 py-3.5">
+            <div className="text-xs text-ink-2">{t.trends.kpiConf}</div>
             <div className="mt-1 flex items-baseline gap-2.5">
-              <span className="font-mono text-xl font-semibold tabular-nums tracking-tight text-emerald-400">
+              <span className="font-mono text-xl font-semibold tabular-nums tracking-tight text-crop">
                 {stats.confidencePct.toFixed(1)}%
               </span>
-              <span className="font-mono text-xs tabular-nums text-[#A1A8B3]">
+              <span className="font-mono text-xs tabular-nums text-ink-2">
                 R² = {stats.rSquared.toFixed(3)}
               </span>
             </div>
-            <div className="mt-1 font-mono text-[11px] tabular-nums text-[#7C8490]">
+            <div className="mt-1 font-mono text-[11px] tabular-nums text-ink-3">
               {stats.baselineMean.toFixed(decimals)} → {stats.recentMean.toFixed(decimals)} {unit}
             </div>
           </div>
@@ -731,18 +731,18 @@ function TrendsTabView({
       </div>
 
       {/* Time-Series Chart + Projection Mode */}
-      <div className="border border-[#262B33] bg-[#111316] p-4 space-y-3.5">
+      <div className="border border-line bg-ground p-4 space-y-3.5">
         <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h3 className="text-sm font-semibold text-[#ECEEF0]">
+            <h3 className="text-sm font-semibold text-ink">
               {varLabel} · {t.trends.chartTitle}
             </h3>
-            <p className="text-xs text-[#A1A8B3]">
+            <p className="text-xs text-ink-2">
               {selectedForecastMode === 'ensemble' ? t.trends.kickerEnsemble : t.trends.kicker}
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-px border border-[#262B33] bg-[#262B33]">
+          <div className="flex flex-wrap items-center gap-px border border-line bg-line">
             {forecastButtons.map((btn) => {
               const active = selectedForecastMode === btn.mode;
               return (
@@ -753,9 +753,9 @@ function TrendsTabView({
                   className={`px-2.5 py-1 text-[11px] transition-colors duration-200 ease-out whitespace-nowrap shrink-0 cursor-pointer ${
                     active
                       ? btn.mode === 'cmip6_ssp585'
-                        ? 'bg-[#222730] text-amber-300 font-medium'
-                        : 'bg-[#222730] text-emerald-300 font-medium'
-                      : 'bg-[#111316] text-[#A1A8B3] hover:text-[#ECEEF0]'
+                        ? 'bg-raised text-warn font-medium'
+                        : 'bg-raised text-crop font-medium'
+                      : 'bg-ground text-ink-2 hover:text-ink'
                   }`}
                 >
                   {btn.label}
@@ -766,13 +766,13 @@ function TrendsTabView({
         </div>
 
         {selectedForecastMode === 'ensemble' && forecastStatus === 'loading' && (
-          <div className="flex items-center gap-2 border border-emerald-500/35 bg-emerald-500/10 px-3 py-2 text-[11px] text-emerald-200">
+          <div className="flex items-center gap-2 border border-crop/35 bg-crop/10 px-3 py-2 text-[11px] text-crop">
             <RefreshCw className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden="true" />
             <span>{t.trends.ensembleLoading}</span>
           </div>
         )}
         {selectedForecastMode === 'ensemble' && forecastStatus === 'error' && (
-          <div className="flex flex-wrap items-center justify-between gap-2 border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200">
+          <div className="flex flex-wrap items-center justify-between gap-2 border border-warn/40 bg-warn/10 px-3 py-2 text-[11px] text-warn">
             <span>
               <span className="font-semibold">{t.trends.ensembleError}:</span> {forecastError}{' '}
               {t.trends.ensembleFallback}
@@ -780,7 +780,7 @@ function TrendsTabView({
             <button
               type="button"
               onClick={onRetryForecast}
-              className="inline-flex items-center gap-1 rounded-[2px] border border-amber-500/50 px-2 py-0.5 text-amber-200 hover:bg-amber-500/20 cursor-pointer"
+              className="inline-flex items-center gap-1 rounded-md border border-warn/50 px-2 py-0.5 text-warn hover:bg-warn/20 cursor-pointer"
             >
               <RefreshCw className="h-3 w-3" aria-hidden="true" />
               {t.trends.ensembleRetry}
@@ -788,19 +788,19 @@ function TrendsTabView({
           </div>
         )}
         {isEnsemble && forecastDataset && (
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[11px] tabular-nums text-[#A1A8B3]">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[11px] tabular-nums text-ink-2">
             {!ensembleCoversVariable ? (
-              <span className="font-sans text-amber-200/90">{t.trends.ensembleEvlandNote}</span>
+              <span className="font-sans text-warn">{t.trends.ensembleEvlandNote}</span>
             ) : (
             <span title={t.trends.ensembleSkillHint}>
               {t.trends.ensembleSkill}:{' '}
               <span
                 className={
                   ensembleSkill === null
-                    ? 'text-[#7C8490]'
+                    ? 'text-ink-3'
                     : ensembleSkill > 0
-                    ? 'text-emerald-300'
-                    : 'text-amber-300'
+                    ? 'text-crop'
+                    : 'text-warn'
                 }
               >
                 {ensembleSkill === null
@@ -812,10 +812,10 @@ function TrendsTabView({
             <span>
               {t.trends.ensembleTrained}: {forecastDataset.trainedUntil}
             </span>
-            <span className="text-[#7C8490] font-sans">{t.trends.ensembleMapping}</span>
+            <span className="text-ink-3 font-sans">{t.trends.ensembleMapping}</span>
             {forecastDataset.sources.climateProjectionErrors && (
               <span
-                className="font-sans text-amber-200/90"
+                className="font-sans text-warn"
                 title={forecastDataset.sources.climateProjectionErrors.join('\n')}
               >
                 {t.trends.ensembleNoCmip}
@@ -827,20 +827,20 @@ function TrendsTabView({
         <div className="h-[260px] sm:h-[280px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={visibleSeries} margin={{ top: 12, right: 14, left: 2, bottom: 2 }}>
-              <CartesianGrid stroke="#262B33" strokeDasharray="3 3" vertical={false} />
+              <CartesianGrid stroke="var(--color-line)" strokeDasharray="3 3" vertical={false} />
               <XAxis
                 dataKey="year"
-                stroke="#7C8490"
-                tick={{ fill: '#A1A8B3', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}
+                stroke="var(--color-ink-3)"
+                tick={{ fill: 'var(--color-ink-2)', fontSize: 11, fontFamily: 'Archivo, sans-serif' }}
                 tickLine={false}
-                axisLine={{ stroke: '#262B33' }}
+                axisLine={{ stroke: 'var(--color-line)' }}
               />
               <YAxis
-                stroke="#7C8490"
+                stroke="var(--color-ink-3)"
                 width={48}
-                tick={{ fill: '#A1A8B3', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}
+                tick={{ fill: 'var(--color-ink-2)', fontSize: 11, fontFamily: 'Archivo, sans-serif' }}
                 tickLine={false}
-                axisLine={{ stroke: '#262B33' }}
+                axisLine={{ stroke: 'var(--color-line)' }}
                 domain={yDomain}
                 tickFormatter={(v: number) => v.toFixed(selectedVariable === 'GWETROOT' ? 2 : 1)}
               />
@@ -858,21 +858,21 @@ function TrendsTabView({
               {forecastMode !== 'historical' && (
                 <ReferenceLine
                   x={2025}
-                  stroke="#7C8490"
+                  stroke="var(--color-ink-3)"
                   strokeDasharray="4 4"
                   label={{
                     value: t.trends.latestObsLabel,
                     position: 'insideTopLeft',
-                    fill: '#A1A8B3',
+                    fill: 'var(--color-ink-2)',
                     fontSize: 10,
-                    fontFamily: 'JetBrains Mono, monospace',
+                    fontFamily: 'Archivo, sans-serif',
                   }}
                 />
               )}
               {effectiveYear < maxYear && (
                 <ReferenceLine
                   x={effectiveYear}
-                  stroke="#10b981"
+                  stroke="var(--color-crop)"
                   strokeWidth={1.5}
                 />
               )}
@@ -881,7 +881,7 @@ function TrendsTabView({
                   type="monotone"
                   dataKey="ciBand"
                   stroke="none"
-                  fill={forecastMode === 'cmip6_ssp585' ? '#d97706' : lineAccent}
+                  fill={forecastMode === 'cmip6_ssp585' ? 'var(--color-warn)' : lineAccent}
                   fillOpacity={0.14}
                   connectNulls={false}
                   isAnimationActive={false}
@@ -890,7 +890,7 @@ function TrendsTabView({
               <Line
                 type="monotone"
                 dataKey="trendLine"
-                stroke="#7C8490"
+                stroke="var(--color-ink-3)"
                 strokeWidth={1.25}
                 strokeDasharray="3 3"
                 dot={false}
@@ -900,10 +900,10 @@ function TrendsTabView({
               <Line
                 type="monotone"
                 dataKey="value"
-                stroke="#A1A8B3"
+                stroke="var(--color-ink-2)"
                 strokeWidth={1.5}
-                dot={{ r: 1.75, fill: '#ECEEF0', strokeWidth: 0 }}
-                activeDot={{ r: 4, fill: '#ECEEF0' }}
+                dot={{ r: 1.75, fill: 'var(--color-ink)', strokeWidth: 0 }}
+                activeDot={{ r: 4, fill: 'var(--color-ink)' }}
                 connectNulls={false}
                 isAnimationActive={false}
               />
@@ -920,7 +920,7 @@ function TrendsTabView({
                 <Line
                   type="monotone"
                   dataKey="projectedValue"
-                  stroke={forecastMode === 'cmip6_ssp585' ? '#d97706' : lineAccent}
+                  stroke={forecastMode === 'cmip6_ssp585' ? 'var(--color-warn)' : lineAccent}
                   strokeWidth={2}
                   strokeDasharray="5 4"
                   dot={false}
@@ -933,9 +933,9 @@ function TrendsTabView({
         </div>
 
         {/* Clean Chart Legend */}
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 border-t border-[#262B33] pt-2.5 text-[11px] text-[#A1A8B3]">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 border-t border-line pt-2.5 text-[11px] text-ink-2">
           <span className="inline-flex items-center gap-1.5">
-            <span className="h-0.5 w-3.5 bg-[#A1A8B3]" />
+            <span className="h-0.5 w-3.5 bg-ink-2" />
             <span>{t.trends.legendObserved}</span>
           </span>
           <span className="inline-flex items-center gap-1.5">
@@ -943,7 +943,7 @@ function TrendsTabView({
             <span>{t.trends.legendMovingAvg}</span>
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <span className="h-0.5 w-3.5 border-t border-dashed border-[#7C8490]" />
+            <span className="h-0.5 w-3.5 border-t border-dashed border-ink-3" />
             <span>{t.trends.legendTrendline}</span>
           </span>
           {forecastMode !== 'historical' && (
@@ -951,7 +951,7 @@ function TrendsTabView({
               <span className="inline-flex items-center gap-1.5">
                 <span
                   className="h-0.5 w-3.5 border-t-2 border-dashed"
-                  style={{ borderColor: forecastMode === 'cmip6_ssp585' ? '#d97706' : lineAccent }}
+                  style={{ borderColor: forecastMode === 'cmip6_ssp585' ? 'var(--color-warn)' : lineAccent }}
                 />
                 <span>{isEnsemble ? t.trends.legendEnsemble : t.trends.legendProjection}</span>
               </span>
@@ -982,22 +982,22 @@ function TrendsTabView({
           <div
             className={`border px-4 py-3 text-xs leading-relaxed ${
               thresholdFinding.crossed || thresholdFinding.alreadyExceeded
-                ? 'border-amber-500/40 bg-amber-500/10 text-amber-200'
-                : 'border-[#262B33] bg-[#111316] text-[#ECEEF0]'
+                ? 'border-warn/40 bg-warn/10 text-warn'
+                : 'border-line bg-ground text-ink'
             }`}
           >
             {lang === 'de' ? thresholdFinding.messageDe : thresholdFinding.messageEn}
           </div>
         )}
 
-        <div className="border border-[#262B33] bg-[#111316] px-4 py-3.5 space-y-1.5">
-          <div className="text-xs font-semibold text-[#ECEEF0]">
+        <div className="border border-line bg-ground px-4 py-3.5 space-y-1.5">
+          <div className="text-xs font-semibold text-ink">
             {t.trends.explainerPrefix}: {explainer.headline}
           </div>
-          <p className="text-xs leading-relaxed text-[#A1A8B3]">
+          <p className="text-xs leading-relaxed text-ink-2">
             {explainer.statisticalInterpretation}
           </p>
-          <p className="text-xs leading-relaxed text-[#7C8490]">
+          <p className="text-xs leading-relaxed text-ink-3">
             {explainer.regionalMechanism}
           </p>
         </div>
@@ -1033,13 +1033,13 @@ function CustomSeriesTooltip({
   const pt = payload[0].payload;
 
   return (
-    <div className="border border-[#262B33] bg-[#111316] px-3 py-2.5 text-xs font-mono tabular-nums text-[#ECEEF0]">
-      <div className="font-semibold border-b border-[#262B33] pb-1 mb-1.5">
+    <div className="border border-line bg-ground px-3 py-2.5 text-xs font-mono tabular-nums text-ink">
+      <div className="font-semibold border-b border-line pb-1 mb-1.5">
         {labels.tooltipYear} {label}
       </div>
       {pt.value !== null && (
         <div className="flex justify-between gap-4">
-          <span className="text-[#A1A8B3]">{labels.tooltipObserved}</span>
+          <span className="text-ink-2">{labels.tooltipObserved}</span>
           <span>
             {pt.value.toFixed(decimals)} {unit}
           </span>
@@ -1047,14 +1047,14 @@ function CustomSeriesTooltip({
       )}
       {pt.movingAvg5Yr !== null && (
         <div className="flex justify-between gap-4">
-          <span className="text-[#A1A8B3]">{labels.tooltipMovingAvg}</span>
+          <span className="text-ink-2">{labels.tooltipMovingAvg}</span>
           <span>
             {pt.movingAvg5Yr.toFixed(decimals)} {unit}
           </span>
         </div>
       )}
       {pt.projectedValue !== null && (
-        <div className="flex justify-between gap-4 text-emerald-300">
+        <div className="flex justify-between gap-4 text-crop">
           <span>{labels.tooltipProjected}</span>
           <span>
             {pt.projectedValue.toFixed(decimals)} {unit}
@@ -1062,7 +1062,7 @@ function CustomSeriesTooltip({
         </div>
       )}
       {pt.ciLower !== null && pt.ciUpper !== null && pt.year >= 2026 && (
-        <div className="flex justify-between gap-4 text-[#A1A8B3]">
+        <div className="flex justify-between gap-4 text-ink-2">
           <span>{labels.tooltipCi}</span>
           <span>
             {pt.ciLower.toFixed(decimals)}–{pt.ciUpper.toFixed(decimals)}
@@ -1116,17 +1116,17 @@ function FieldShiftTabView({
   return (
     <div role="tabpanel" className="space-y-5">
       {/* SoilGrids Asymmetric Summary */}
-      <div className="border border-[#262B33] bg-[#111316] p-4 space-y-4">
-        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#262B33] pb-3">
+      <div className="border border-line bg-ground p-4 space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line pb-3">
           <div>
-            <p className="text-xs text-[#A1A8B3]">
-              {t.soil.kicker} · <span className="font-mono text-[#ECEEF0]">1990–{periodEndLabel}</span>
+            <p className="text-xs text-ink-2">
+              {t.soil.kicker} · <span className="font-mono text-ink">1990–{periodEndLabel}</span>
             </p>
-            <h2 className="mt-0.5 text-sm font-semibold text-[#ECEEF0]">
+            <h2 className="mt-0.5 text-sm font-semibold text-ink">
               {localizeRegionName(dataset.regionName, dataset.lat, dataset.lon, lang)}
             </h2>
           </div>
-          <span className="rounded-[2px] border border-emerald-500/35 bg-emerald-500/12 px-2.5 py-0.5 text-xs font-medium text-emerald-300 shrink-0">
+          <span className="rounded-md border border-crop/35 bg-crop/12 px-2.5 py-0.5 text-xs font-medium text-crop shrink-0">
             {localizeSoilTexture(dataset.soil.textureClass, lang)}
           </span>
         </div>
@@ -1134,12 +1134,12 @@ function FieldShiftTabView({
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
           <div className="md:col-span-5 grid grid-cols-2 gap-4">
             <div>
-              <div className="text-xs text-[#A1A8B3]">{t.soil.phTitle}</div>
+              <div className="text-xs text-ink-2">{t.soil.phTitle}</div>
               <div className="mt-1 flex items-baseline gap-2">
-                <span className="font-mono text-2xl font-semibold tabular-nums text-[#ECEEF0]">
+                <span className="font-mono text-2xl font-semibold tabular-nums text-ink">
                   {dataset.soil.ph.toFixed(1)}
                 </span>
-                <span className="text-[11px] text-[#A1A8B3]">
+                <span className="text-[11px] text-ink-2">
                   {dataset.soil.ph < 6.0
                     ? t.soil.phAcidic
                     : dataset.soil.ph > 7.5
@@ -1150,57 +1150,57 @@ function FieldShiftTabView({
             </div>
 
             <div>
-              <div className="text-xs text-[#A1A8B3]">{t.soil.socTitle}</div>
+              <div className="text-xs text-ink-2">{t.soil.socTitle}</div>
               <div className="mt-1 flex items-baseline gap-1.5">
-                <span className="font-mono text-2xl font-semibold tabular-nums text-emerald-400">
+                <span className="font-mono text-2xl font-semibold tabular-nums text-crop">
                   {dataset.soil.socPercent.toFixed(2)}
                 </span>
-                <span className="font-mono text-xs text-[#A1A8B3]">{t.soil.socUnit}</span>
+                <span className="font-mono text-xs text-ink-2">{t.soil.socUnit}</span>
               </div>
             </div>
           </div>
 
-          <div className="md:col-span-7 space-y-2 md:border-l md:border-[#262B33] md:pl-4">
+          <div className="md:col-span-7 space-y-2 md:border-l md:border-line md:pl-4">
             <div className="flex items-center justify-between gap-2 text-xs">
-              <span className="inline-flex items-center gap-1.5 text-[#A1A8B3]">
-                <Layers3 className="h-3.5 w-3.5 text-amber-400" aria-hidden="true" />
+              <span className="inline-flex items-center gap-1.5 text-ink-2">
+                <Layers3 className="h-3.5 w-3.5 text-warn" aria-hidden="true" />
                 <span>{t.soil.textureTitle}</span>
               </span>
-              <span className="font-mono text-[11px] tabular-nums text-[#ECEEF0]">
+              <span className="font-mono text-[11px] tabular-nums text-ink">
                 {t.soil.clay} {dataset.soil.clayPercent}% · {t.soil.silt} {dataset.soil.siltPercent}% · {t.soil.sand} {dataset.soil.sandPercent}%
               </span>
             </div>
 
-            <div className="flex h-2 w-full overflow-hidden bg-[#262B33]">
+            <div className="flex h-2 w-full overflow-hidden bg-line">
               <div
                 style={{ width: `${dataset.soil.clayPercent}%` }}
-                className="bg-amber-500/85"
+                className="bg-warn/85"
                 title={`${t.soil.clay} ${dataset.soil.clayPercent}%`}
               />
               <div
                 style={{ width: `${dataset.soil.siltPercent}%` }}
-                className="bg-emerald-500/85"
+                className="bg-crop/85"
                 title={`${t.soil.silt} ${dataset.soil.siltPercent}%`}
               />
               <div
                 style={{ width: `${dataset.soil.sandPercent}%` }}
-                className="bg-[#6B7280]"
+                className="bg-ink-3"
                 title={`${t.soil.sand} ${dataset.soil.sandPercent}%`}
               />
             </div>
 
-            <div className="flex items-center justify-between gap-4 text-[11px] text-[#A1A8B3] pt-0.5">
+            <div className="flex items-center justify-between gap-4 text-[11px] text-ink-2 pt-0.5">
               <span className="inline-flex items-center gap-1.5">
-                <Thermometer className="h-3 w-3 text-amber-400" aria-hidden="true" />
+                <Thermometer className="h-3 w-3 text-warn" aria-hidden="true" />
                 <span>{t.soil.heatTitle}:</span>
-                <span className="font-mono text-amber-300">
+                <span className="font-mono text-warn">
                   {dataset.peakHeatMonths.map((m) => monthNames[m - 1]).join(' · ')}
                 </span>
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <Droplets className="h-3 w-3 text-[#ECEEF0]" aria-hidden="true" />
+                <Droplets className="h-3 w-3 text-ink" aria-hidden="true" />
                 <span>{t.soil.moistureTitle}:</span>
-                <span className="font-mono text-[#ECEEF0]">
+                <span className="font-mono text-ink">
                   {dataset.moistureDeficitMonths.map((m) => monthNames[m - 1]).join(' · ')}
                 </span>
               </span>
@@ -1210,11 +1210,11 @@ function FieldShiftTabView({
       </div>
 
       {/* Baseline Crop & Farm Priorities */}
-      <div className="border border-[#262B33] bg-[#111316] p-4 space-y-4">
+      <div className="border border-line bg-ground p-4 space-y-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h3 className="text-sm font-semibold text-[#ECEEF0]">{t.fieldShift.title}</h3>
-            <p className="text-xs text-[#A1A8B3]">{t.fieldShift.subtitle}</p>
+            <h3 className="text-sm font-semibold text-ink">{t.fieldShift.title}</h3>
+            <p className="text-xs text-ink-2">{t.fieldShift.subtitle}</p>
           </div>
           <div className="sm:w-64">
             <label htmlFor="baseline-crop-select" className="sr-only">
@@ -1224,7 +1224,7 @@ function FieldShiftTabView({
               id="baseline-crop-select"
               value={baselineCrop}
               onChange={(e) => onChangeBaselineCrop(e.target.value as BaselineCropId)}
-              className="w-full rounded-[2px] border border-[#262B33] bg-[#171A1F] px-3 py-1.5 text-xs text-[#ECEEF0] focus:border-emerald-400 focus:outline-none transition-colors duration-200 ease-out"
+              className="w-full rounded-md border border-line bg-panel px-3 py-1.5 text-xs text-ink focus:border-crop focus:outline-none transition-colors duration-200 ease-out"
             >
               {BASELINE_CROP_OPTIONS.map((opt) => (
                 <option key={opt.id} value={opt.id}>
@@ -1235,10 +1235,10 @@ function FieldShiftTabView({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5 border-t border-[#262B33] pt-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5 border-t border-line pt-3">
           {priorityItems.map((item) => (
             <label key={item.key} className="flex items-center justify-between gap-3 text-xs">
-              <span className="text-[#A1A8B3] w-36 shrink-0">{item.label}</span>
+              <span className="text-ink-2 w-36 shrink-0">{item.label}</span>
               <input
                 type="range"
                 min={10}
@@ -1246,9 +1246,9 @@ function FieldShiftTabView({
                 step={5}
                 value={priorities[item.key]}
                 onChange={(e) => onChangePriority(item.key, Number(e.target.value))}
-                className="flex-1 accent-emerald-500 cursor-pointer"
+                className="flex-1 accent-crop cursor-pointer"
               />
-              <span className="font-mono text-[11px] tabular-nums text-[#ECEEF0] w-8 text-right">
+              <span className="font-mono text-[11px] tabular-nums text-ink w-8 text-right">
                 {priorities[item.key]}
               </span>
             </label>
@@ -1258,8 +1258,8 @@ function FieldShiftTabView({
 
       {/* Asymmetric Scenario Selector & Detail */}
       {activeScenario && (
-        <div className="border border-[#262B33] bg-[#111316]">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-[#262B33] border-b border-[#262B33]">
+        <div className="border border-line bg-ground">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-line border-b border-line">
             {scenarios.map((scenario) => {
               const selected = scenario.id === activeScenario.id;
               return (
@@ -1268,21 +1268,21 @@ function FieldShiftTabView({
                   type="button"
                   onClick={() => onSelectScenario(scenario.id)}
                   className={`p-3.5 text-left transition-colors duration-200 ease-out cursor-pointer ${
-                    selected ? 'bg-[#1C2128]' : 'bg-[#111316] hover:bg-[#171A1F]'
+                    selected ? 'bg-raised' : 'bg-ground hover:bg-panel'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] text-[#A1A8B3]">{scenario.badgeLabel}</span>
+                    <span className="text-[11px] text-ink-2">{scenario.badgeLabel}</span>
                     <span
                       className={`font-mono text-xs font-semibold tabular-nums ${
-                        selected ? 'text-emerald-400' : 'text-[#ECEEF0]'
+                        selected ? 'text-crop' : 'text-ink'
                       }`}
                     >
                       {scenario.fitScore}/100
                     </span>
                   </div>
-                  <div className="mt-1 text-xs font-semibold text-[#ECEEF0]">{scenario.title}</div>
-                  <div className="mt-0.5 text-[11px] text-[#7C8490] line-clamp-1">
+                  <div className="mt-1 text-xs font-semibold text-ink">{scenario.title}</div>
+                  <div className="mt-0.5 text-[11px] text-ink-3 line-clamp-1">
                     {scenario.cropsSummary}
                   </div>
                 </button>
@@ -1292,19 +1292,19 @@ function FieldShiftTabView({
 
           <div className="p-4 space-y-4">
             <div className="space-y-1">
-              <div className="text-xs font-semibold text-[#ECEEF0]">{t.fieldShift.whySuggested}</div>
-              <p className="text-xs leading-relaxed text-[#A1A8B3]">{activeScenario.whySuggested}</p>
+              <div className="text-xs font-semibold text-ink">{t.fieldShift.whySuggested}</div>
+              <p className="text-xs leading-relaxed text-ink-2">{activeScenario.whySuggested}</p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-[#262B33] pt-3.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-line pt-3.5">
               <div className="space-y-1.5">
-                <div className="text-xs font-semibold text-emerald-400">
+                <div className="text-xs font-semibold text-crop">
                   {t.fieldShift.expectedBenefits}
                 </div>
-                <ul className="space-y-1 text-xs leading-relaxed text-[#ECEEF0]">
+                <ul className="space-y-1 text-xs leading-relaxed text-ink">
                   {activeScenario.expectedBenefits.map((benefit, idx) => (
                     <li key={idx} className="flex items-start gap-2">
-                      <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-emerald-400 shrink-0" />
+                      <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-crop shrink-0" />
                       <span>{benefit}</span>
                     </li>
                   ))}
@@ -1312,13 +1312,13 @@ function FieldShiftTabView({
               </div>
 
               <div className="space-y-1.5">
-                <div className="text-xs font-semibold text-amber-400">
+                <div className="text-xs font-semibold text-warn">
                   {t.fieldShift.risksValidation}
                 </div>
-                <ul className="space-y-1 text-xs leading-relaxed text-[#A1A8B3]">
+                <ul className="space-y-1 text-xs leading-relaxed text-ink-2">
                   {activeScenario.risksAndValidation.map((risk, idx) => (
                     <li key={idx} className="flex items-start gap-2">
-                      <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-amber-400 shrink-0" />
+                      <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-warn shrink-0" />
                       <span>{risk}</span>
                     </li>
                   ))}
@@ -1327,26 +1327,26 @@ function FieldShiftTabView({
             </div>
 
             {/* Compact 36-Month Cover & Stress Calendar */}
-            <div className="border-t border-[#262B33] pt-3.5 space-y-2.5">
+            <div className="border-t border-line pt-3.5 space-y-2.5">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <h4 className="text-xs font-semibold text-[#ECEEF0]">
+                  <h4 className="text-xs font-semibold text-ink">
                     {t.fieldShift.calendarTitle}
                   </h4>
-                  <p className="text-[11px] text-[#7C8490]">{t.fieldShift.calendarSubtitle}</p>
+                  <p className="text-[11px] text-ink-3">{t.fieldShift.calendarSubtitle}</p>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-3 text-[11px] text-[#A1A8B3]">
+                <div className="flex flex-wrap items-center gap-3 text-[11px] text-ink-2">
                   <span className="inline-flex items-center gap-1.5">
-                    <span className="h-2.5 w-2.5 bg-[#334155]" />
+                    <span className="h-2.5 w-2.5 bg-line-strong" />
                     <span>{t.fieldShift.legendCash}</span>
                   </span>
                   <span className="inline-flex items-center gap-1.5">
-                    <span className="h-2.5 w-2.5 bg-emerald-500/75" />
+                    <span className="h-2.5 w-2.5 bg-crop/75" />
                     <span>{t.fieldShift.legendCover}</span>
                   </span>
                   <span className="inline-flex items-center gap-1.5">
-                    <span className="h-2.5 w-2.5 bg-amber-500/75" />
+                    <span className="h-2.5 w-2.5 bg-warn/75" />
                     <span>{t.fieldShift.legendBare}</span>
                   </span>
                 </div>
@@ -1356,8 +1356,8 @@ function FieldShiftTabView({
                 {activeScenario.calendarYears.map((yr) => (
                   <div key={yr.yearNumber} className="space-y-1">
                     <div className="flex items-center justify-between text-[11px]">
-                      <span className="font-mono text-[#ECEEF0] font-medium">{yr.yearLabel}</span>
-                      <span className="text-[#7C8490] truncate ml-2">{yr.sequenceTitle}</span>
+                      <span className="font-mono text-ink font-medium">{yr.yearLabel}</span>
+                      <span className="text-ink-3 truncate ml-2">{yr.sequenceTitle}</span>
                     </div>
                     <div className="grid grid-cols-6 sm:grid-cols-12 gap-1">
                       {yr.months.map((cell) => {
@@ -1367,21 +1367,21 @@ function FieldShiftTabView({
                         const isActiveTimelineMonth = activeMonths.includes(cell.month);
                         const bgClass =
                           cell.coverStatus === 'cover'
-                            ? 'bg-emerald-500/20 border-emerald-500/45 text-emerald-200'
+                            ? 'bg-crop/20 border-crop/45 text-crop'
                             : cell.coverStatus === 'bare_risk'
-                            ? 'bg-amber-500/20 border-amber-500/45 text-amber-200'
-                            : 'bg-[#1D232B] border-[#2E3642] text-[#ECEEF0]';
+                            ? 'bg-warn/20 border-warn/45 text-warn'
+                            : 'bg-raised border-line-strong text-ink';
                         return (
                           <button
                             key={cell.month}
                             type="button"
                             onClick={() => onSelectMonthCell({ yearLabel: yr.yearLabel, cell })}
                             title={`${cell.monthLabel}: ${cell.cropName}`}
-                            className={`rounded-[2px] border px-1 py-1.5 text-center transition-colors duration-200 ease-out cursor-pointer ${bgClass} ${
+                            className={`rounded-md border px-1 py-1.5 text-center transition-colors duration-200 ease-out cursor-pointer ${bgClass} ${
                               isSelected
-                                ? 'ring-1 ring-[#ECEEF0]'
+                                ? 'ring-1 ring-ink'
                                 : isActiveTimelineMonth
-                                ? 'ring-1 ring-emerald-400/80'
+                                ? 'ring-1 ring-crop/80'
                                 : ''
                             }`}
                           >
@@ -1392,9 +1392,9 @@ function FieldShiftTabView({
                               <span
                                 className={`h-1 w-1 rounded-full ${
                                   cell.stressFlag === 'heat_stress'
-                                    ? 'bg-amber-400'
+                                    ? 'bg-warn'
                                     : cell.stressFlag === 'water_stress'
-                                    ? 'bg-[#ECEEF0]'
+                                    ? 'bg-ink'
                                     : 'bg-transparent'
                                 }`}
                               />
@@ -1407,13 +1407,13 @@ function FieldShiftTabView({
                 ))}
               </div>
 
-              <div className="border border-[#262B33] bg-[#171A1F] px-3 py-2 text-xs text-[#A1A8B3]">
+              <div className="border border-line bg-panel px-3 py-2 text-xs text-ink-2">
                 {selectedMonthCell ? (
                   <div>
-                    <span className="font-mono font-semibold text-[#ECEEF0]">
+                    <span className="font-mono font-semibold text-ink">
                       {selectedMonthCell.yearLabel} · {selectedMonthCell.cell.monthLabel}:
                     </span>{' '}
-                    <span className="text-emerald-300 font-medium">
+                    <span className="text-crop font-medium">
                       {selectedMonthCell.cell.cropName}
                     </span>{' '}
                     — {selectedMonthCell.cell.note}

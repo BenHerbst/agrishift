@@ -68,7 +68,7 @@ export const VARIABLE_META: Record<ClimateVariable, VariableMetadata> = {
     label: 'Air Temperature at 2m',
     shortLabel: 'T2M · Temp 2m',
     unit: '°C',
-    accentHex: '#d97706',
+    accentHex: '#B5452B',
     description: 'Near-surface air temperature governing growing degree days and heat stress.',
   },
   PRECTOTCORR: {
@@ -76,7 +76,7 @@ export const VARIABLE_META: Record<ClimateVariable, VariableMetadata> = {
     label: 'Precipitation',
     shortLabel: 'PRECTOTCORR',
     unit: 'mm/day',
-    accentHex: '#eceef0',
+    accentHex: '#2F6A8A',
     description: 'Daily precipitation rate controlling soil recharge and rainfed yield.',
   },
   GWETROOT: {
@@ -84,7 +84,7 @@ export const VARIABLE_META: Record<ClimateVariable, VariableMetadata> = {
     label: 'Root-Zone Soil Moisture',
     shortLabel: 'GWETROOT',
     unit: 'frac',
-    accentHex: '#10b981',
+    accentHex: '#2F6B3C',
     description: 'Moisture saturation across the 0–100 cm active crop rooting column.',
   },
   EVLAND: {
@@ -92,7 +92,7 @@ export const VARIABLE_META: Record<ClimateVariable, VariableMetadata> = {
     label: 'Evapotranspiration',
     shortLabel: 'EVLAND · ET',
     unit: 'mm/day',
-    accentHex: '#d97706',
+    accentHex: '#A0561A',
     description: 'Total water flux returned to the atmosphere via soil evaporation and crop transpiration.',
   },
 };
