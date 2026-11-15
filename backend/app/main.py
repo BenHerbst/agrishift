@@ -18,11 +18,13 @@ from . import cache as forecast_cache
 from .calibration import (
     CALIBRATABLE, apply_corrections, compute_corrections, delete_station_data, load_station_data, save_station_data,
 )
-from .data import RateLimited, fetch_climate_indices
+from .data import fetch_climate_indices
 from .ensemble import forecast_location
 from .features import MONTHLY_VARIABLES, period_means, to_monthly
 from .members import MAX_HORIZON_MONTHS, PROPHET_AVAILABLE
+from .pollution import SOURCES, crop_safety, fetch_infrastructure, read_air_quality
 from .risk import BASE_YEARS, RECENT_YEARS, seasonal_risk
+from .rotation import CROPS, plan_rotation
 from .seasonal import fetch_seasonal
 from .soil import DEFAULT_ROOT_DEPTH_CM, fetch_soil, historical_water_stats, soil_profile
 from .sources import fetch_daily, fetch_projections
@@ -80,7 +82,7 @@ def _daily(lat: float, lon: float) -> Tuple[pd.DataFrame, Dict]:
 
 MEMORY_ENTRIES = 32
 _memory: "OrderedDict[str, Dict]" = OrderedDict()  # fingerprint key -> cache entry, newest last
-# A degraded result (some climate models failed, e.g. an Open-Meteo rate limit) is never written to
+# A degraded result (some climate models failed to load) is never written to
 # disk; it is kept in memory for DEGRADED_TTL_S only, so a later request retries the models without
 # every request in between re-training the whole ensemble.
 DEGRADED_TTL_S = float(os.environ.get("DEGRADED_CACHE_TTL_S", 900))
@@ -174,6 +176,26 @@ def _soil(lat: float, lon: float) -> Dict:
     return fetch_soil(lat, lon)
 
 
+@lru_cache(maxsize=64)
+def _infrastructure(lat: float, lon: float) -> Dict:
+    return fetch_infrastructure(lat, lon)
+
+
+def _site_pollution(lat: float, lon: float) -> Dict:
+    """Nearby pollution sources, air quality and the crop-safety verdict. Raises if OpenStreetMap fails."""
+    nearest = _infrastructure(round(lat, 4), round(lon, 4))  # road distances need ~10 m, not the 1 km grid
+    # Air quality is a second opinion – without it the distances alone still give a verdict
+    air = read_air_quality(*_key(lat, lon)) or {
+        "error": f"Not downloaded yet: python scripts/download_copernicus.py --lat {lat} --lon {lon} --only cams"}
+    return {
+        "infrastructure": {c: {**s, "emits": SOURCES[c][-1]} for c, s in nearest.items()},
+        "air_quality": air,
+        **crop_safety(nearest, None if "error" in air else air),
+        "note": "Screening from distances (OpenStreetMap) and modelled air (CAMS reanalysis), not a measurement – "
+                "a soil test decides at 'caution' and 'avoid' sites.",
+    }
+
+
 def _clear_caches():
     """Forget everything held in memory (the disk cache is keyed by its inputs and stays valid)."""
     _daily.cache_clear()
@@ -184,8 +206,6 @@ def _clear_caches():
 def _upstream(fn, *args):
     try:
         return fn(*args)
-    except RateLimited as exc:
-        raise HTTPException(status_code=429, detail=f"Open-Meteo rate limit: {exc}")
     except HTTPException:
         raise
     except Exception as exc:
@@ -421,6 +441,73 @@ def soil(
         "water": historical_water_stats(daily, profile["total_available_water_mm"], kc),
         "layers": raw["layers"],
         "units": raw["units"],
+    }
+
+
+@app.get("/pollution")
+def pollution(lat: float = LatQuery, lon: float = LonQuery):
+    """Is it safe to grow food here? Pollution from roads, railways, industry, power plants, airports,
+    landfills and quarries around the field (OpenStreetMap) plus air quality (CAMS reanalysis: ozone, NO₂, SO₂, PM2.5),
+    turned into a safe / caution / avoid verdict per crop group with what to do about it.
+    """
+    try:
+        return {"latitude": lat, "longitude": lon, **_site_pollution(lat, lon)}
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Could not load OpenStreetMap data: {exc}")
+
+
+@app.get("/rotation")
+def rotation(
+    lat: float = LatQuery,
+    lon: float = LonQuery,
+    years: int = Query(3, ge=1, le=3),
+    history: Optional[str] = Query(None, description=f"Crops of the last years, oldest first, comma-separated. "
+                                                     f"Known crops: {', '.join(CROPS)}"),
+    use_pollution: bool = Query(True, description="Leave out crops that are unsafe here because of nearby pollution"),
+    refresh: bool = Query(False, description="Ignore the cached forecast and retrain (~25 s)"),
+):
+    """Crop rotation: one crop per forecast year, scored on the forecast warmth, water and heat for its
+    growing months, the soil and nearby pollution, and chosen so the rotation stays healthy (breaks
+    between crop families, legumes before nitrogen-hungry crops). Each year lists the alternatives too.
+    """
+    planted = [c.strip() for c in (history or "").split(",") if c.strip()]
+    unknown = [c for c in planted if c not in CROPS]
+    if unknown:
+        raise HTTPException(status_code=400, detail=f"Unknown crops: {unknown}. Known crops: {list(CROPS)}")
+    key = _key(lat, lon)
+    result, cache_info = _upstream(_location, *key, refresh)
+    horizon = min(years * 12, MAX_HORIZON_MONTHS)
+    forecasts = {v: r["forecast"][:horizon] for v, r in result["variables"].items()}
+
+    taw = ph = None
+    try:
+        profile = soil_profile(_soil(*key))
+        taw, ph = profile["total_available_water_mm"], profile["topsoil_0_30cm"]["ph"]
+        soil_info = {"texture_class": profile["texture_class"], "ph": ph, "total_available_water_mm": taw}
+    except Exception as exc:
+        soil_info = {"error": f"No soil data, soil storage and pH left out: {exc}"}
+    safety = aot40 = None
+    if use_pollution:
+        try:
+            safety = _site_pollution(lat, lon)
+            aot40 = safety["air_quality"].get("ozone_aot40_may_jul_ug_m3_h")
+        except Exception as exc:
+            safety = None
+            pollution_info = {"error": f"No pollution data, left out: {exc}"}
+        else:
+            pollution_info = {g: v["verdict"] for g, v in safety["crop_groups"].items()}
+    else:
+        pollution_info = None
+    return {
+        "latitude": lat,
+        "longitude": lon,
+        "cache": cache_info,
+        "sources": result["sources"],
+        "soil": soil_info,
+        "pollution": pollution_info,
+        "history": planted,
+        "plan": plan_rotation(forecasts, lat, planted, taw, ph, safety, aot40),
+        "crops": {name: crop["family"] for name, crop in CROPS.items()},
     }
 
 

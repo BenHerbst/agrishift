@@ -30,7 +30,7 @@ def _hourly(days=3, lon=6.0):
 def test_era5land_hourly_to_daily():
     assert len(era5land.hourly_to_daily(_hourly(), lat=50.8, lon=6.0)) == 3   # 6° E: local day = UTC day
     daily = era5land.hourly_to_daily(_hourly(), lat=50.8, lon=30.0)          # 30° E: UTC+2
-    assert list(daily.columns) == list(DAILY_VARS.values())
+    assert list(daily.columns) == DAILY_VARS
     assert len(daily) == 2  # the partial first and last local days (22 and 2 hours) are dropped
     day = daily.iloc[0]
     assert day["tmax"] == pytest.approx(20.0, abs=0.1) and day["tmin"] == pytest.approx(10.0, abs=0.1)
@@ -103,22 +103,27 @@ def test_weather_fallback_order(daily, monkeypatch):
         calls.append(name)
         if name == "era5land":
             return None                                   # not downloaded
-        if name == "nasa_power":
-            raise RuntimeError("server down")
         return daily
 
     monkeypatch.setattr(sources, "_weather", fake)
     df = sources.fetch_daily(1, 2)
-    assert calls == ["era5land", "nasa_power", "open_meteo"]
-    assert df.attrs["source"] == "open_meteo" and len(df.attrs["skipped"]) == 2
+    assert calls == ["era5land", "nasa_power"]
+    assert df.attrs["source"] == "nasa_power" and len(df.attrs["skipped"]) == 1
+
+    def down(name, lat, lon):
+        raise RuntimeError("server down")
+
+    monkeypatch.setattr(sources, "_weather", down)
+    with pytest.raises(RuntimeError, match="No weather source available"):
+        sources.fetch_daily(1, 2)
 
     monkeypatch.setattr(sources, "_weather", lambda name, lat, lon: daily["2020":])  # too short everywhere
     with pytest.raises(RuntimeError, match="only 6 years"):
         sources.fetch_daily(1, 2)
 
 
-def test_projection_fallback(monkeypatch):
+def test_projections_not_downloaded_is_not_an_error(monkeypatch):
     monkeypatch.setattr(sources.cmip6, "read_projections", lambda lat, lon: (None, []))
-    monkeypatch.setattr(sources, "fetch_open_meteo_projections", lambda lat, lon: (pd.DataFrame({"tmean": [1.0]}), ["M"], []))
-    frame, models, errors = sources.fetch_projections(1, 2)
-    assert models == ["open_meteo:M"] and errors == []
+    assert sources.fetch_projections(1, 2) == (None, [], [])  # forecast still gets cached on disk
+    monkeypatch.setattr(sources.cmip6, "read_projections", lambda lat, lon: (pd.DataFrame({"tmean": [1.0]}), ["M"]))
+    assert sources.fetch_projections(1, 2)[1:] == (["cds_cmip6:M"], [])

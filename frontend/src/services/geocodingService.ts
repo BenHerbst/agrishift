@@ -53,17 +53,20 @@ const BUILTIN_PLACES: BuiltinPlaceEntry[] = [
   { id: 'sao_paulo', nameEn: 'São Paulo', nameDe: 'São Paulo', countryEn: 'Brazil', countryDe: 'Brasilien', lat: -23.5505, lon: -46.6333, displayEn: 'São Paulo, Brazil', displayDe: 'São Paulo, Brasilien' },
 ];
 
-interface OpenMeteoGeoItem {
-  id: number;
-  name: string;
-  latitude: number;
-  longitude: number;
-  country?: string;
-  admin1?: string;
+// Photon (komoot): free OpenStreetMap search built for search-as-you-type, no key
+interface PhotonFeature {
+  geometry: { coordinates: [number, number] };
+  properties: {
+    osm_type: string;
+    osm_id: number;
+    name?: string;
+    state?: string;
+    country?: string;
+  };
 }
 
-interface OpenMeteoGeoResponse {
-  results?: OpenMeteoGeoItem[];
+interface PhotonResponse {
+  features?: PhotonFeature[];
 }
 
 export async function searchPlaces(
@@ -83,22 +86,23 @@ export async function searchPlaces(
   }
 
   try {
-    const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(
+    const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(
       trimmed
-    )}&count=6&language=${lang}&format=json`;
+    )}&limit=6&lang=${lang}&osm_tag=place`;
     const res = await fetch(url, { signal: controller.signal });
     if (res.ok) {
-      const data = (await res.json()) as OpenMeteoGeoResponse;
-      if (Array.isArray(data.results) && data.results.length > 0) {
-        return data.results.map((item) => {
-          const parts = [item.name, item.admin1, item.country].filter(Boolean);
+      const data = (await res.json()) as PhotonResponse;
+      const places = (data.features ?? []).filter((f) => f.properties.name);
+      if (places.length > 0) {
+        return places.map(({ geometry, properties: item }) => {
+          const parts = [item.name, item.state, item.country].filter(Boolean);
           return {
-            id: `om-${item.id}`,
-            name: item.name,
-            admin1: item.admin1,
+            id: `osm-${item.osm_type}${item.osm_id}`,
+            name: item.name as string,
+            admin1: item.state,
             country: item.country ?? '',
-            lat: item.latitude,
-            lon: item.longitude,
+            lat: geometry.coordinates[1],
+            lon: geometry.coordinates[0],
             displayLabel: parts.join(', '),
           };
         });

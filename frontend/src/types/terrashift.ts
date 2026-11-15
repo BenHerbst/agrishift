@@ -304,7 +304,7 @@ export interface ForecastSources {
   seasonalForecast: string | null;
   stationCalibration: string[] | null;
   climateProjections: string[] | null;
-  /** Climate models that failed to load (e.g. Open-Meteo rate limit); forecast runs without them. */
+  /** Climate models that failed to load; forecast runs without them. */
   climateProjectionErrors: string[] | null;
   climateIndices: Record<string, string> | null;
 }

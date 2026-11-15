@@ -28,7 +28,7 @@ def make_daily(start="1980-01-01", end="2025-12-31", warming_per_decade=0.4, see
         "soil_moisture_7_28": np.clip(0.3 - 0.04 * season + rng.normal(0, 0.01, len(idx)), 0, 0.5),
         "soil_moisture_28_100": np.clip(0.3 - 0.02 * season + rng.normal(0, 0.01, len(idx)), 0, 0.5),
     }, index=idx)
-    assert set(df.columns) == set(DAILY_VARS.values())
+    assert set(df.columns) == set(DAILY_VARS)
     return df
 
 
@@ -69,3 +69,12 @@ def calls(daily, monkeypatch, tmp_path):
 @pytest.fixture()
 def client(calls) -> TestClient:
     return TestClient(main.app)
+
+
+@pytest.fixture()
+def offline_pollution(monkeypatch):
+    monkeypatch.setattr(main, "fetch_infrastructure", lambda lat, lon: {"main_road": {"distance_m": 20, "name": "B3"}})
+    monkeypatch.setattr(main, "read_air_quality", lambda lat, lon: {"ozone_aot40_may_jul_ug_m3_h": 5000})
+    main._infrastructure.cache_clear()
+    yield
+    main._infrastructure.cache_clear()

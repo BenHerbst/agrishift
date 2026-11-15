@@ -34,10 +34,10 @@ bun run dev                            # http://localhost:3000
 The frontend's Express server proxies `/api/climate/*` to the backend, so the browser only ever talks to
 port 3000.
 
-> **First request for a new location takes 1–2 minutes.** The backend downloads ~45 years of reanalysis
-> and trains every model. The app shows the measured record meanwhile and switches to the forecast once it
-> arrives. Repeat visits to the same location are instant. Open-Meteo's free tier allows about two new
-> locations per day; set `OPEN_METEO_API_KEY` on the backend for more.
+> **First request for a new location takes 1–2 minutes.** The backend downloads ~40 years of NASA POWER
+> weather and trains every model. The app shows the measured record meanwhile and switches to the forecast
+> once it arrives. Repeat visits to the same location are instant. For the best data (ERA5-Land, CMIP6
+> projections, CAMS air quality) run `backend/scripts/download_copernicus.py` for the location once.
 
 ## How the data fits together
 
@@ -75,4 +75,4 @@ extension and the Forecast & Risk tab shows a retry button.
 | `CORS_ORIGINS` | backend | `*` | Comma-separated allowed origins for direct browser access |
 | `GEMINI_API_KEY` | frontend server | unset | Optional AI-written site summary |
 
-Backend options (Prophet, SEAS5, station calibration, Open-Meteo key) are in `backend/README.md`.
+Backend options (Prophet, SEAS5, Copernicus downloads, station calibration) are in `backend/README.md`.

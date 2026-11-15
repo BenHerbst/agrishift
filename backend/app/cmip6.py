@@ -6,8 +6,8 @@ downloaded per 5° × 5° region (plus a 1° margin) and shared by every locatio
 computed per model with FAO-56 Penman-Monteith from the model's own temperature, radiation, wind and
 humidity. Models without humidity use the minimum temperature as dew point (FAO-56 fallback).
 
-The output has the same columns and units as the Open-Meteo projections (monthly sums / means), so
-`projections.cmip_trends` works on either. Download with scripts/download_copernicus.py; the API only
+The output has the same columns and units as the observed monthly data (monthly sums / means), which
+is what `projections.cmip_trends` expects. Download with scripts/download_copernicus.py; the API only
 reads the cache.
 """
 import logging
